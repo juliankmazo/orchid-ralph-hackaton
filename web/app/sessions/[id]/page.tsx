@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession, parseTranscript, timeAgo, formatDuration } from "../../lib/api";
 import { LiveRefresh } from "../../components/live-refresh";
 import { AISummary } from "../../components/ai-summary";
+import { CopyLink } from "../../components/copy-link";
 
 function MetadataItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -196,6 +197,7 @@ export default async function SessionPage({
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <CopyLink />
           <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
             {turns.length} turns
           </span>
