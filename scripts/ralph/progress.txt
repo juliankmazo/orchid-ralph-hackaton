@@ -8,6 +8,7 @@
 - CLI lives under cli/ — mirrors server structure: TypeScript, commonjs, ES2022 target
 - CLI binary at cli/bin/orchid requires `../dist/main.js` (build first with `npm run build`)
 - CLI config (ORCHID_API_URL, ORCHID_API_KEY) lives in cli/src/config.ts — import getConfig() when needed
+- Git metadata collection: import `collectGitMetadata()` from cli/src/commands/claude.ts — returns GitMetadata interface
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -36,4 +37,17 @@
   - bin/orchid uses `require("../dist/main.js")` — must build before running via bin
   - Stub commands (claude.ts, data.ts) are ready for subsequent stories to flesh out
   - getConfig() in config.ts centralizes env var reading — future commands should import it
+---
+
+## 2026-03-28 - US-007
+- Implemented git metadata collection in `orchid claude` subcommand
+- Files changed: cli/src/commands/claude.ts (rewritten from stub)
+- `collectGitMetadata()` collects: user_name, user_email, branch, git_remotes, working_dir
+- Metadata printed to stderr before launch (prefixed with `[orchid]`)
+- Gracefully handles non-git dirs (returns "unknown"/"detached"/empty arrays)
+- Scans immediate subdirectories for additional git remotes
+- **Learnings for future iterations:**
+  - `collectGitMetadata()` is exported so US-008/009/010 can reuse it for the sync PUT body
+  - `execGit()` helper swallows errors and returns "" — safe for non-git directories
+  - The `GitMetadata` interface is exported for type reuse in sync/watcher code
 ---
