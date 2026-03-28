@@ -3,6 +3,9 @@
 - Use `npx tsc --noEmit` from `server/` directory to typecheck
 - Database connection uses `pg.Pool` with `DATABASE_URL` env var
 - Express app exported from `src/index.ts`, db pool from `src/db.ts`
+- Migrations live in `server/migrations/` as plain SQL, run via `src/migrate.ts` on startup
+- Use `CREATE TABLE IF NOT EXISTS` for idempotent migrations
+- Server startup is async via `start()` function in index.ts
 
 # Ralph Progress Log
 Started: Sat Mar 28 12:50:55 PDT 2026
@@ -20,4 +23,17 @@ Started: Sat Mar 28 12:50:55 PDT 2026
   - API_KEY env var read but not enforced yet (used in later stories)
   - Health endpoint at GET /health tries a DB query but returns ok even if DB is down (graceful)
   - `npx tsc --noEmit` from server/ directory for typecheck
+---
+
+## 2026-03-28 - US-002
+- Implemented: DB migration for sessions table with all required columns
+- Files changed:
+  - server/migrations/001_sessions.sql (CREATE TABLE IF NOT EXISTS with all columns)
+  - server/src/migrate.ts (reads and executes migration SQL on startup)
+  - server/src/index.ts (async start() function calls runMigrations before listen)
+- **Learnings for future iterations:**
+  - Migration runner reads SQL from `../migrations/` relative to `__dirname` (works for both dev and built dist/)
+  - Server startup is now async — wrap in `start()` function pattern
+  - Status column uses CHECK constraint for 'active'|'done' enum
+  - started_at and updated_at default to NOW(), so inserts don't need to specify them
 ---
