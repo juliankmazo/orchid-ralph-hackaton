@@ -26,6 +26,8 @@ orchid data list                       # List all sessions
 orchid data show <id> [--turns]        # View full transcript
 orchid data search "why websockets"    # Search across all conversations
 orchid data summary <id>               # AI-generated session summary
+orchid data decisions [repo]           # AI-extracted architectural decision log
+orchid data ask <id> [question]        # Ask questions about a session (interactive if no question)
 orchid review <branch>                 # AI-powered conversation-aware review
 orchid explain <commit-sha>            # Explain why a commit was made
 ```
@@ -36,7 +38,10 @@ orchid explain <commit-sha>            # Explain why a commit was made
 
 - **Sessions Dashboard** — See all conversations, live status, team stats
 - **Session Viewer** — Full conversation replay with timeline, markdown rendering
+- **Commits Tab** — See git commits that happened during the session, with diff stats and file changes
+- **Chat (Ask)** — Ask questions about a session's conversation, AI reasons through the transcript
 - **AI Summary** — Click-to-generate AI summaries of any conversation
+- **Decision Log** — AI-extracted architectural decisions across sessions, linked to exact conversation turns
 - **Search** — Full-text search across all conversations
 - **Team Activity** — Per-user session cards, active indicators
 
@@ -44,6 +49,9 @@ orchid explain <commit-sha>            # Explain why a commit was made
 - Create/update/delete sessions
 - Full-text search
 - AI-powered summaries (OpenAI)
+- Session chat Q&A (`POST /sessions/:id/chat`)
+- Commit history per session (`GET /sessions/:id/commits`)
+- Decision log extraction (`GET /decisions`)
 - GitHub PR webhook (auto-comment with related conversations)
 
 ## Tech Stack
