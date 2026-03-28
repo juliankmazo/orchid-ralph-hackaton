@@ -9,6 +9,8 @@ Orchid captures AI coding conversations and makes them available to anyone who n
 - **Web UI**: http://24.144.97.81
 - **API**: http://24.144.97.81:3000
 
+![Sessions Dashboard](web/public/screenshot-sessions.png)
+
 ## How It Works
 
 1. **Capture**: Run `orchid claude` instead of `claude`. The conversation syncs to the cloud in real-time.
@@ -29,6 +31,9 @@ orchid explain <commit-sha>            # Explain why a commit was made
 ```
 
 ### Web UI
+
+![Conversation Viewer](web/public/screenshot-conversation.png)
+
 - **Sessions Dashboard** — See all conversations, live status, team stats
 - **Session Viewer** — Full conversation replay with timeline, markdown rendering
 - **AI Summary** — Click-to-generate AI summaries of any conversation
