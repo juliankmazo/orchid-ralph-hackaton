@@ -81,3 +81,32 @@ body {
 .animate-slide-in {
   animation: slideIn 0.2s ease-out;
 }
+
+/* Timeline connector between messages */
+.timeline-connector {
+  position: relative;
+}
+
+.timeline-connector::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 32px;
+  bottom: -24px;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.timeline-connector:last-child::before {
+  display: none;
+}
+
+/* Staggered fade-in for conversation messages */
+.message-enter {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+/* Code block styles */
+.code-block:hover {
+  border-color: var(--border) !important;
+}

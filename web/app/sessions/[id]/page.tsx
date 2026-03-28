@@ -256,9 +256,11 @@ export default async function SessionPage({
             <p className="text-sm">No conversation messages found in this session.</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {turns.map((turn, i) => (
-              <MessageBubble key={i} role={turn.role} text={turn.text} userName={userName} turnNumber={i + 1} />
+              <div key={i} className="timeline-connector message-enter" style={{ animationDelay: `${i * 0.05}s` }} id={`turn-${i + 1}`}>
+                <MessageBubble role={turn.role} text={turn.text} userName={userName} turnNumber={i + 1} />
+              </div>
             ))}
           </div>
         )}
