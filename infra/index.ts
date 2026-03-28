@@ -34,11 +34,18 @@ apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Optio
 apt-get install -y curl git build-essential unzip jq htop tmux
 
 # Node.js 22 via fnm
+export HOME=/root
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="/root/.local/share/fnm:$PATH"
-eval "$(fnm env)"
+eval "$(fnm env --shell bash)"
 fnm install 22
 fnm default 22
+
+# Make fnm available in future sessions
+cat >> /root/.bashrc << 'BASHRC'
+export PATH="/root/.local/share/fnm:$PATH"
+eval "$(fnm env --shell bash)"
+BASHRC
 
 # pnpm
 npm install -g pnpm
