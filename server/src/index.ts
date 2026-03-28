@@ -388,31 +388,54 @@ app.post("/sessions/:id/chat", requireApiKey, async (req: Request, res: Response
       return;
     }
 
-    // Parse transcript into turns
+    // Parse transcript into turns — handle multiple JSONL formats from Claude Code
     const lines = session.transcript.split("\n").filter((l: string) => l.trim());
     const turns: Array<{ role: string; text: string }> = [];
+
+    function extractText(content: unknown): string {
+      if (typeof content === "string") return content;
+      if (Array.isArray(content)) {
+        return content
+          .map((block: { type?: string; text?: string }) => {
+            if (typeof block === "string") return block;
+            if (block && block.type === "text" && typeof block.text === "string") return block.text;
+            return "";
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+      return "";
+    }
+
     for (const line of lines) {
       try {
         const obj = JSON.parse(line);
         let role = "";
         let text = "";
-        if (obj.type === "human" || obj.role === "user" || obj.role === "human") {
+
+        // Check obj.message first (Claude Code JSONL wraps messages)
+        const msg = obj.message || obj;
+        const msgRole = msg.role || obj.type;
+
+        if (msgRole === "user" || msgRole === "human") {
           role = "Developer";
-          text = typeof obj.content === "string" ? obj.content : JSON.stringify(obj.content);
-        } else if (obj.type === "assistant" || obj.role === "assistant") {
+          text = extractText(msg.content || obj.content);
+        } else if (msgRole === "assistant") {
           role = "AI";
-          text = typeof obj.content === "string" ? obj.content : JSON.stringify(obj.content);
+          text = extractText(msg.content || obj.content);
         }
+
         if (role && text) {
-          turns.push({ role, text: text.slice(0, 1000) });
+          turns.push({ role, text });
         }
       } catch {
         // skip
       }
     }
 
+    // Send the full conversation to a capable model
     const conversationText = turns
-      .map((t) => `[${t.role}]: ${t.text}`)
+      .map((t, i) => `[Turn ${i + 1}][${t.role}]: ${t.text}`)
       .join("\n\n");
 
     // Build chat messages with optional history
@@ -428,12 +451,13 @@ Session info:
 - Tool: ${session.tool || "unknown"}
 - Started: ${session.started_at}
 - Status: ${session.status}
+- Total turns: ${turns.length}
 
 Here is the full conversation transcript:
 
 ${conversationText}
 
-Answer the user's question based on this conversation. Be specific and cite relevant parts of the conversation when possible. If the answer isn't in the conversation, say so. Be concise but thorough.`,
+Answer the user's question based on this conversation. Be specific and cite relevant parts (by turn number) when possible. If the answer isn't in the conversation, say so. Be concise but thorough.`,
       },
     ];
 
@@ -455,14 +479,16 @@ Answer the user's question based on this conversation. Be specific and cite rele
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages,
-        max_tokens: 1000,
+        max_tokens: 2000,
         temperature: 0.3,
       }),
     });
 
     if (!response.ok) {
+      const errBody = await response.text();
+      console.error("OpenAI API error:", response.status, errBody);
       res.status(502).json({ error: "AI service error" });
       return;
     }
