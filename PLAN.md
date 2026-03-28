@@ -4,11 +4,11 @@
 
 ## Problem
 
-When AI writes code, the conversations behind it are invisible. A reviewer sees a PR diff but has no idea *why* the AI made certain decisions — what the developer asked for, what alternatives were discussed, what tradeoffs were made. The context is lost.
+When AI writes code, the conversations behind it are invisible. A reviewer sees a PR diff but has no idea _why_ the AI made certain decisions — what the developer asked for, what alternatives were discussed, what tradeoffs were made. The context is lost.
 
 ## Goal
 
-Code tells you what exists. Git tells you when it changed and who changed it. But neither tells you *why*. The conversations between developers and AI tools are the missing piece — they capture the reasoning, the tradeoffs, the decisions. We want to capture those conversations and make them available to anyone — or any agent — that needs them: a teammate reviewing a PR, a new developer trying to understand a module, or an agent picking up where someone left off.
+Code tells you what exists. Git tells you when it changed and who changed it. But neither tells you _why_. The conversations between developers and AI tools are the missing piece — they capture the reasoning, the tradeoffs, the decisions. We want to capture those conversations and make them available to anyone — or any agent — that needs them: a teammate reviewing a PR, a new developer trying to understand a module, or an agent picking up where someone left off.
 
 ## Key Principles
 
@@ -85,7 +85,7 @@ This means an AI-assisted code review is just:
 > Review PR #42. Use `orchid data` to check the conversations behind it.
 ```
 
-Claude Code runs the commands, reads the results, and gives a review that understands *why* things were done. No MCP server, no special integration — the CLI is the agent interface.
+Claude Code runs the commands, reads the results, and gives a review that understands _why_ things were done. No MCP server, no special integration — the CLI is the agent interface.
 
 ### 2. Web UI — the home base
 
@@ -228,7 +228,9 @@ Powered by OpenAI API / Codex SDK — configured via `OPENAI_API_KEY` or similar
 
 1. **Session list** — all conversations, browsable by time / person
 2. **Session viewer** — full conversation replay
-  - Live-updating if session is still active (polling to start, WebSocket later)
+
+- Live-updating if session is still active (polling to start, WebSocket later)
+
 3. **PR view** — all conversations related to a PR (linked via timestamps + git history)
 4. **Commit view** — diff + conversation side-by-side
 
@@ -262,3 +264,14 @@ Hosting:    Single DigitalOcean droplet (everything on one box)
 ## **Reminder: Test and use everything as you build it.**
 
 This cannot be overstated. Every feature you build, you use immediately. Every command you add to the CLI, you run it yourself. Every endpoint on the server, you hit it. If something feels off, fix it before moving on. The goal is a product that works, not a codebase that compiles. The only way to know it works is to use it — constantly, critically, as a real user would.
+
+## Notes
+
+- Use the agent-browser skill to test your app. Always use the headed browser mode.
+- Push every change. Create prs and merge them as you go
+- Remember to always deploy to digital ocean as well
+- Use the production ui frequently to check its quality
+- If you finished everything -> reason again on the main goal and the phases and either add more functionality, add more testing, improve UX ui, make it cleaner, make it smarter
+- For design of interfaces I like linear
+- For design of the cli -> I like the tui of claude code
+- Remember to commit everything, except the secrets file (it’s already in GitHub ignore)
