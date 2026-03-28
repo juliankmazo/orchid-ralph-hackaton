@@ -15,6 +15,7 @@
 - Session ID derived from transcript filename via `sessionIdFromPath()` in cli/src/sync.ts
 - Uses global `fetch` (Node 18+) for HTTP calls — no external HTTP deps needed
 - `fetchSession(id)` in data.ts fetches a single session by ID (GET /sessions/:id) — reuse for any single-session query
+- `fetchSessions(query?)` supports optional search — appends `?q=` when query provided
 - JSONL parsing: `parseTranscriptTurns()` handles multiple Claude Code formats (type/role/message.role) and extracts text from string or content-block arrays
 
 ## 2026-03-28 20:07 - US-005
@@ -127,4 +128,20 @@
   - Claude Code JSONL has multiple message formats: `{type:"human"}`, `{role:"user"}`, `{message:{role:...}}` — parseTranscriptTurns handles all
   - Content blocks can be strings or arrays of `{type:"text", text:"..."}` objects — `extractTextContent()` normalizes both
   - The `dataShow()` function is async, wired into runData switch the same way as dataList
+---
+
+## 2026-03-28 - US-013
+- Implemented `orchid data search <query>` command
+- Modified `fetchSessions()` to accept optional query param, appends `?q=` to URL
+- Added `extractMatchContext()` to find first match in transcript and extract surrounding context (±60 chars)
+- For each matching session, fetches full session individually to get transcript for context extraction
+- Prints: short ID, user, time ago, and one line of matching context
+- Prints "No sessions matching <query>" when no results
+- Added "search" case to runData subcommand router
+- Files changed: cli/src/commands/data.ts
+- **Learnings for future iterations:**
+  - `fetchSessions(query?)` now supports optional search — reuse for any filtered list
+  - Server GET /sessions?q= does ILIKE search on transcript but does NOT return transcript in results
+  - To show context snippets, must fetch each session individually (N+1 pattern) — fine for POC scale
+  - `extractMatchContext()` does case-insensitive indexOf, extracts ±60 chars around first match, collapses whitespace
 ---
