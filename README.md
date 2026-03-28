@@ -38,24 +38,13 @@ ssh -i ~/.ssh/orchid-agent root@174.138.46.71
 
 ## Using Ralph (Autonomous Agent)
 
-Ralph is a multi-agent pipeline that builds a full project from a one-line idea: spec → build → test → deploy.
+Ralph is an autonomous agent loop that implements user stories from a `prd.json` spec.
 
 **Setup (one-time):**
-1. Write your idea to `IDEA.md`
-2. Set DigitalOcean credentials (`DO_TOKEN`, `DO_SSH_KEY_ID`, `DO_REGISTRY`)
+1. Generate a `prd.json` from your specs (ask Claude Code to convert your PRD)
+2. Review and iterate on `prd.json` until satisfied
 
-**Run the full pipeline:**
-```bash
-./scripts/ralph/orchestrate.sh
-```
-
-This runs four phases automatically:
-1. **Architect** — generates specs and `prd.json` from `IDEA.md`
-2. **Workers** — parallel agents implement backend, frontend, and infra stories simultaneously
-3. **QA** — runs tests, auto-fixes failures, blocks deploy if broken
-4. **Deploy** — builds a Docker image and deploys to a DigitalOcean Droplet
-
-**Run a single agent loop** (if you already have a `prd.json`):
+**Run:**
 ```bash
 ./scripts/ralph/ralph.sh --tool claude
 ```
