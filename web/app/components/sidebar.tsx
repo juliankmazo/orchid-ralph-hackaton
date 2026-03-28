@@ -101,6 +101,26 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Command palette hint */}
+      <div className="px-2 mb-1">
+        <div
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] cursor-pointer transition-colors"
+          style={{ color: "var(--text-tertiary)" }}
+          onClick={() => {
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="7" cy="7" r="4" />
+            <path d="M10 10l3 3" />
+          </svg>
+          <span>Quick Find</span>
+          <kbd className="ml-auto text-[9px] px-1 py-0.5 rounded" style={{ background: "var(--bg-tertiary)" }}>
+            {"\u2318"}K
+          </kbd>
+        </div>
+      </div>
+
       {/* How it works */}
       <div className="px-4 pt-2 pb-3 flex-1">
         <div className="text-[10px] uppercase font-medium tracking-wider mb-2" style={{ color: "var(--text-tertiary)" }}>
