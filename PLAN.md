@@ -257,4 +257,8 @@ Hosting:    Single DigitalOcean droplet (everything on one box)
 
 **POC deployment**: Everything runs on a single droplet with root access — Node.js server, Postgres, frontend, all on the same box. Nginx as a reverse proxy if needed, open whatever ports are necessary. Keep it simple — no containers, no separate services, no CI/CD. SSH in, deploy, done.
 
+---
 
+## **Reminder: Test and use everything as you build it.**
+
+This cannot be overstated. Every feature you build, you use immediately. Every command you add to the CLI, you run it yourself. Every endpoint on the server, you hit it. If something feels off, fix it before moving on. The goal is a product that works, not a codebase that compiles. The only way to know it works is to use it — constantly, critically, as a real user would.
