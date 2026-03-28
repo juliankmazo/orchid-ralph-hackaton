@@ -20,7 +20,7 @@ function OrchidLogo() {
 const navItems = [
   {
     label: "Sessions",
-    href: "/",
+    href: "/dashboard",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="2" width="12" height="12" rx="2" />
@@ -83,7 +83,7 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 p-2">
         {navItems.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

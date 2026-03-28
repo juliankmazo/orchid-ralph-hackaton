@@ -24,7 +24,7 @@ export default function NotFound() {
           The page you are looking for does not exist.
         </p>
         <Link
-          href="/"
+          href="/dashboard"
           className="text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           style={{
             background: "var(--accent)",
