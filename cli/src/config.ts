@@ -1,13 +1,33 @@
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+const CONFIG_FILE = path.join(os.homedir(), ".orchid", "config.json");
+
+function readConfigFile(): Record<string, string> {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
 export function getConfig() {
-  const apiUrl = process.env.ORCHID_API_URL;
-  const apiKey = process.env.ORCHID_API_KEY;
+  const file = readConfigFile();
+
+  const apiUrl = process.env.ORCHID_API_URL || file.api_url;
+  const apiKey = process.env.ORCHID_API_KEY || file.api_key;
 
   if (!apiUrl) {
-    console.error("Error: ORCHID_API_URL environment variable is required");
+    console.error(
+      'Error: ORCHID_API_URL not set. Run "orchid config" to set up.'
+    );
     process.exit(1);
   }
   if (!apiKey) {
-    console.error("Error: ORCHID_API_KEY environment variable is required");
+    console.error(
+      'Error: ORCHID_API_KEY not set. Run "orchid config" to set up.'
+    );
     process.exit(1);
   }
 
