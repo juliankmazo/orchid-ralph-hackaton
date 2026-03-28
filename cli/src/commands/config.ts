@@ -102,7 +102,7 @@ function runSet(args: string[]) {
     process.exit(1);
   }
 
-  const config = { ...DEFAULTS, ...readConfig() };
+  const config: Record<string, string> = { ...DEFAULTS, ...readConfig() };
   config[key] = value;
   writeConfig(config);
   console.error(`\x1b[32m✓\x1b[0m Set ${key}`);
@@ -122,7 +122,7 @@ function runGet(args: string[]) {
     process.exit(1);
   }
 
-  const config = { ...DEFAULTS, ...readConfig() };
+  const config: Record<string, string> = { ...DEFAULTS, ...readConfig() };
   const value = config[key] || "";
   console.log(value);
 }
