@@ -13,6 +13,7 @@ interface Session {
   updated_at: string;
   status: string;
   transcript?: string;
+  message_count?: number;
 }
 
 function timeAgo(dateStr: string): string {
@@ -76,9 +77,11 @@ function printTable(sessions: Session[]): void {
   console.log("-".repeat(header.length));
 
   for (const s of sessions) {
-    const msgCount = s.transcript
-      ? `${s.transcript.split("\n").filter((l) => l.trim()).length} messages`
-      : "? messages";
+    const msgCount = s.message_count != null && s.message_count > 0
+      ? `${s.message_count} messages`
+      : s.transcript
+        ? `${s.transcript.split("\n").filter((l) => l.trim()).length} messages`
+        : "—";
 
     const row = [
       padRight(shortId(s.id), 14),
