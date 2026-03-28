@@ -118,6 +118,7 @@ Environment:
     return;
   }
 
+  const webUrl = process.env.ORCHID_WEB_URL || "http://24.144.97.81";
   console.log(`\x1b[32mFound ${sessions.length} related conversation${sessions.length > 1 ? "s" : ""}\x1b[0m\n`);
 
   // Fetch full transcripts for the top sessions (max 3)
@@ -146,6 +147,7 @@ Environment:
     console.log(`\x1b[1m━━━ Session: ${session.id} ━━━\x1b[0m`);
     console.log(`\x1b[90m  By: ${session.user_name} | Branch: ${session.branch} | ${userMessages} user + ${aiMessages} AI messages\x1b[0m`);
     console.log(`\x1b[90m  Status: ${session.status} | Started: ${new Date(session.started_at).toLocaleString()}\x1b[0m`);
+    console.log(`\x1b[34m  Web: ${webUrl}/sessions/${encodeURIComponent(session.id)}\x1b[0m`);
     console.log();
 
     if (turns.length === 0) {
