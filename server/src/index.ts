@@ -114,6 +114,98 @@ app.get("/stats", requireApiKey, async (_req: Request, res: Response) => {
   }
 });
 
+// GitHub webhook: auto-comment on PRs with related conversations
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const WEB_UI_URL = process.env.WEB_UI_URL || "http://24.144.97.81";
+
+app.post("/webhook/github", async (req: Request, res: Response) => {
+  const event = req.headers["x-github-event"] as string;
+
+  if (event !== "pull_request") {
+    res.json({ ok: true, skipped: true });
+    return;
+  }
+
+  const { action, pull_request, repository } = req.body;
+  if (action !== "opened" && action !== "synchronize") {
+    res.json({ ok: true, skipped: true });
+    return;
+  }
+
+  if (!GITHUB_TOKEN) {
+    console.warn("GITHUB_TOKEN not set, skipping PR comment");
+    res.json({ ok: true, skipped: true, reason: "no token" });
+    return;
+  }
+
+  try {
+    const repoUrl = repository.clone_url || repository.html_url;
+    const branch = pull_request.head.ref;
+
+    // Find sessions that match this repo and/or branch
+    const result = await pool.query(
+      `SELECT id, user_name, branch, started_at, updated_at, status,
+              LENGTH(transcript) as transcript_length
+       FROM sessions
+       WHERE (git_remotes::text ILIKE $1 OR branch = $2)
+       ORDER BY updated_at DESC
+       LIMIT 10`,
+      [`%${repository.full_name}%`, branch]
+    );
+
+    if (result.rows.length === 0) {
+      res.json({ ok: true, sessions: 0 });
+      return;
+    }
+
+    // Build the comment
+    const sessions = result.rows;
+    const sessionLines = sessions.map((s: { id: string; user_name: string; branch: string; started_at: string; updated_at: string; status: string; transcript_length: number }) => {
+      const duration = Math.round(
+        (new Date(s.updated_at).getTime() - new Date(s.started_at).getTime()) / 60000
+      );
+      const msgEstimate = Math.round(s.transcript_length / 500);
+      const statusEmoji = s.status === "active" ? "🟢" : "✅";
+      return `- ${statusEmoji} **Session by @${s.user_name}** (${duration}m, ~${msgEstimate} messages) — [View conversation](${WEB_UI_URL}/sessions/${encodeURIComponent(s.id)})`;
+    });
+
+    const comment = `🌸 **Orchid**: ${sessions.length} AI conversation${sessions.length > 1 ? "s" : ""} related to this PR
+
+${sessionLines.join("\n")}
+
+---
+*These conversations capture the reasoning behind the code changes. Click to see the full developer-AI dialogue.*`;
+
+    // Post to GitHub
+    const [owner, repo] = repository.full_name.split("/");
+    const ghRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/issues/${pull_request.number}/comments`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ body: comment }),
+      }
+    );
+
+    if (!ghRes.ok) {
+      const errText = await ghRes.text();
+      console.error("GitHub API error:", ghRes.status, errText);
+      res.status(502).json({ error: "GitHub API error" });
+      return;
+    }
+
+    console.log(`Posted comment on ${repository.full_name}#${pull_request.number} with ${sessions.length} sessions`);
+    res.json({ ok: true, sessions: sessions.length });
+  } catch (err) {
+    console.error("Webhook error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 async function start() {
   try {
     await runMigrations();
