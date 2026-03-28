@@ -1,12 +1,17 @@
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import pool from "./db";
 
 export async function runMigrations(): Promise<void> {
-  const sql = readFileSync(
-    join(__dirname, "..", "migrations", "001_sessions.sql"),
-    "utf-8"
-  );
-  await pool.query(sql);
-  console.log("Migrations applied successfully");
+  const migrationsDir = join(__dirname, "..", "migrations");
+  const files = readdirSync(migrationsDir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  for (const file of files) {
+    const sql = readFileSync(join(migrationsDir, file), "utf-8");
+    await pool.query(sql);
+  }
+
+  console.log(`Migrations applied: ${files.length} files`);
 }

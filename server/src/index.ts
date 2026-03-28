@@ -32,22 +32,30 @@ app.put("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { user_name, user_email, working_dir, git_remotes, branch, tool, transcript, status } = req.body;
 
+  // Count messages in transcript
+  let messageCount = 0;
+  if (transcript) {
+    const lines = (transcript as string).split("\n").filter((l: string) => l.trim());
+    messageCount = lines.length;
+  }
+
   try {
     const result = await pool.query(
-      `INSERT INTO sessions (id, user_name, user_email, working_dir, git_remotes, branch, tool, transcript, status, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      `INSERT INTO sessions (id, user_name, user_email, working_dir, git_remotes, branch, tool, transcript, status, message_count, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
        ON CONFLICT (id) DO UPDATE SET
-         user_name   = EXCLUDED.user_name,
-         user_email  = EXCLUDED.user_email,
-         working_dir = EXCLUDED.working_dir,
-         git_remotes = EXCLUDED.git_remotes,
-         branch      = EXCLUDED.branch,
-         tool        = EXCLUDED.tool,
-         transcript  = EXCLUDED.transcript,
-         status      = EXCLUDED.status,
-         updated_at  = NOW()
+         user_name     = EXCLUDED.user_name,
+         user_email    = EXCLUDED.user_email,
+         working_dir   = EXCLUDED.working_dir,
+         git_remotes   = EXCLUDED.git_remotes,
+         branch        = EXCLUDED.branch,
+         tool          = EXCLUDED.tool,
+         transcript    = EXCLUDED.transcript,
+         status        = EXCLUDED.status,
+         message_count = EXCLUDED.message_count,
+         updated_at    = NOW()
        RETURNING *`,
-      [id, user_name, user_email, working_dir, JSON.stringify(git_remotes), branch, tool, transcript, status || "active"]
+      [id, user_name, user_email, working_dir, JSON.stringify(git_remotes), branch, tool, transcript, status || "active", messageCount]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -62,7 +70,7 @@ app.get("/sessions", requireApiKey, async (req: Request, res: Response) => {
     let result;
     if (q) {
       result = await pool.query(
-        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status
+        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status, message_count
          FROM sessions
          WHERE transcript ILIKE $1
          ORDER BY started_at DESC`,
@@ -70,7 +78,7 @@ app.get("/sessions", requireApiKey, async (req: Request, res: Response) => {
       );
     } else {
       result = await pool.query(
-        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status
+        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status, message_count
          FROM sessions
          ORDER BY started_at DESC`
       );

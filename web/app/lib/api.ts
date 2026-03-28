@@ -13,6 +13,7 @@ export interface Session {
   updated_at: string;
   status: string;
   transcript?: string;
+  message_count?: number;
 }
 
 export interface Stats {

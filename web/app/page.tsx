@@ -236,6 +236,12 @@ export default async function SessionsPage() {
                     <span>{session.user_name}</span>
                     <span>&middot;</span>
                     <span className="font-mono">{session.branch}</span>
+                    {session.message_count != null && session.message_count > 0 && (
+                      <>
+                        <span>&middot;</span>
+                        <span>{session.message_count} msgs</span>
+                      </>
+                    )}
                     {session.working_dir && (
                       <>
                         <span>&middot;</span>
