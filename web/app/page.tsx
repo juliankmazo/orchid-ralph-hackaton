@@ -181,9 +181,30 @@ export default async function SessionsPage() {
           </div>
         ) : (
           <div className="flex flex-col">
-            {sessions.map((session, i) => (
+            {activeSessions.length > 0 && (
+              <div className="flex items-center gap-2 py-2 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot" style={{ background: "var(--green)" }} />
+                <span className="text-[10px] uppercase font-semibold tracking-wider" style={{ color: "var(--green)" }}>
+                  Active Sessions
+                </span>
+              </div>
+            )}
+            {sessions.map((session, i) => {
+              // Show "Recent" separator when we transition from active to done
+              const prevSession = i > 0 ? sessions[i - 1] : null;
+              const showRecentSeparator = prevSession?.status === "active" && session.status !== "active";
+
+              return (
+              <div key={session.id}>
+              {showRecentSeparator && (
+                <div className="flex items-center gap-2 py-2 mt-2 mb-1">
+                  <span className="text-[10px] uppercase font-semibold tracking-wider" style={{ color: "var(--text-tertiary)" }}>
+                    Recent
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: "var(--border-subtle)" }} />
+                </div>
+              )}
               <Link
-                key={session.id}
                 href={`/sessions/${encodeURIComponent(session.id)}`}
                 className="session-row flex items-center gap-4 px-3 py-3 -mx-3 rounded-lg transition-colors group"
                 style={{
@@ -243,7 +264,9 @@ export default async function SessionsPage() {
                   <path d="M6 4l4 4-4 4" />
                 </svg>
               </Link>
-            ))}
+              </div>
+              );
+            })}
           </div>
         )}
       </div>
