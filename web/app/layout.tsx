@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "./components/sidebar";
 import { KeyboardNav } from "./components/keyboard-nav";
 import { CommandPalette } from "./components/command-palette";
+import { TitleUpdater } from "./components/title-updater";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,6 +43,7 @@ export default function RootLayout({
           <main className="flex-1 overflow-auto">
             <KeyboardNav />
             <CommandPalette />
+            <TitleUpdater />
             {children}
           </main>
         </div>
