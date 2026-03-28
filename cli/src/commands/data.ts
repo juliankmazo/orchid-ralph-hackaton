@@ -30,10 +30,6 @@ function timeAgo(dateStr: string): string {
   return `${diffDay}d ago`;
 }
 
-function shortId(id: string): string {
-  return id.length > 12 ? id.slice(0, 12) : id;
-}
-
 function truncateDir(dir: string): string {
   return path.basename(dir);
 }
@@ -64,31 +60,36 @@ function printTable(sessions: Session[]): void {
     return;
   }
 
+  // Compute column widths from the data
+  const idWidth = Math.max(4, ...sessions.map((s) => s.id.length));
+  const userWidth = Math.max(4, ...sessions.map((s) => (s.user_name || "unknown").length));
+  const dirWidth = Math.max(3, ...sessions.map((s) => truncateDir(s.working_dir || "").length));
+
   const header = [
-    padRight("ID", 14),
-    padRight("USER", 16),
-    padRight("DIR", 20),
+    padRight("ID", idWidth),
+    padRight("USER", userWidth),
+    padRight("DIR", dirWidth),
     padRight("TIME", 10),
-    padRight("MESSAGES", 10),
+    padRight("MESSAGES", 12),
     padRight("STATUS", 8),
   ].join("  ");
 
   console.log(header);
-  console.log("-".repeat(header.length));
+  console.log("─".repeat(header.length));
 
   for (const s of sessions) {
     const msgCount = s.message_count != null && s.message_count > 0
-      ? `${s.message_count} messages`
+      ? String(s.message_count)
       : s.transcript
-        ? `${s.transcript.split("\n").filter((l) => l.trim()).length} messages`
+        ? String(s.transcript.split("\n").filter((l) => l.trim()).length)
         : "—";
 
     const row = [
-      padRight(shortId(s.id), 14),
-      padRight(s.user_name || "unknown", 16),
-      padRight(truncateDir(s.working_dir || ""), 20),
+      padRight(s.id, idWidth),
+      padRight(s.user_name || "unknown", userWidth),
+      padRight(truncateDir(s.working_dir || ""), dirWidth),
       padRight(timeAgo(s.updated_at || s.started_at), 10),
-      padRight(msgCount, 10),
+      padRight(msgCount, 12),
       padRight(s.status || "unknown", 8),
     ].join("  ");
 
@@ -293,7 +294,7 @@ async function dataSearch(args: string[]): Promise<void> {
     }
 
     console.log(
-      `${shortId(s.id)}  ${padRight(s.user_name || "unknown", 16)}  ${padRight(timeAgo(s.updated_at || s.started_at), 10)}`
+      `${s.id}  ${padRight(s.user_name || "unknown", 16)}  ${padRight(timeAgo(s.updated_at || s.started_at), 10)}`
     );
     if (context) {
       console.log(`  ${context}`);

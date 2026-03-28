@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getSessions, getStats, timeAgo } from "./lib/api";
-import { LiveRefresh } from "./components/live-refresh";
+import { getSessions, getStats, timeAgo } from "../../lib/api";
+import { LiveRefresh } from "../../components/live-refresh";
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === "active";

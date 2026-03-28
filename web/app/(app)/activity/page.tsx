@@ -1,4 +1,4 @@
-import { getSessions, timeAgo } from "../lib/api";
+import { getSessions, timeAgo } from "../../lib/api";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
