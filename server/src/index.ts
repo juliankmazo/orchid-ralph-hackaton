@@ -114,6 +114,20 @@ app.get("/stats", requireApiKey, async (_req: Request, res: Response) => {
   }
 });
 
+app.delete("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query("DELETE FROM sessions WHERE id = $1 RETURNING id", [req.params.id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    res.json({ deleted: result.rows[0].id });
+  } catch (err) {
+    console.error("DELETE /sessions/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // AI summary endpoint
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
