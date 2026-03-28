@@ -3,6 +3,7 @@ import { getSession, parseTranscript, timeAgo, formatDuration } from "../../lib/
 import { LiveRefresh } from "../../components/live-refresh";
 import { AISummary } from "../../components/ai-summary";
 import { CopyLink } from "../../components/copy-link";
+import { TurnHighlighter } from "./turn-highlighter";
 
 function MetadataItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -133,10 +134,14 @@ export const dynamic = "force-dynamic";
 
 export default async function SessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ turn?: string }>;
 }) {
   const { id } = await params;
+  const { turn } = await searchParams;
+  const highlightTurn = turn ? parseInt(turn, 10) : null;
 
   let session;
   try {
@@ -163,6 +168,7 @@ export default async function SessionPage({
   return (
     <div className="animate-fade-in">
       {isActive && <LiveRefresh />}
+      {highlightTurn !== null && !isNaN(highlightTurn) && <TurnHighlighter turn={highlightTurn} />}
 
       {/* Header */}
       <header
@@ -197,6 +203,18 @@ export default async function SessionPage({
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {session.git_remotes && session.git_remotes.length > 0 && (() => {
+            const repoName = session.git_remotes[0].split("/").pop()?.replace(/\.git$/, "") || "";
+            return repoName ? (
+              <Link
+                href={`/decisions?repo=${encodeURIComponent(repoName)}`}
+                className="flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded transition-opacity hover:opacity-80"
+                style={{ background: "var(--bg-tertiary)", color: "var(--accent)", border: "1px solid var(--border-subtle)" }}
+              >
+                🧠 Decision Log
+              </Link>
+            ) : null;
+          })()}
           <CopyLink />
           <span className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
             {turns.length} turns

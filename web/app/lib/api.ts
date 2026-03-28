@@ -141,6 +141,25 @@ export function formatDuration(start: string, end: string): string {
   return `${hours}h ${remainMin}m`;
 }
 
+export interface Decision {
+  title: string;
+  decision: string;
+  alternatives: string[];
+  reason: string;
+  session_id: string;
+  turn_index: number;
+}
+
+export interface DecisionsResult {
+  decisions: Decision[];
+  sessions_analyzed: number;
+}
+
+export async function getDecisions(repo?: string): Promise<DecisionsResult> {
+  const path = repo ? `/decisions?repo=${encodeURIComponent(repo)}` : "/decisions";
+  return apiFetch<DecisionsResult>(path);
+}
+
 export function countMessages(transcript?: string): number {
   if (!transcript) return 0;
   return transcript.split("\n").filter((l) => l.trim()).length;

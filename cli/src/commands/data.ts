@@ -338,6 +338,52 @@ async function dataSummary(args: string[]): Promise<void> {
   }
 }
 
+async function dataDecisions(args: string[]): Promise<void> {
+  const repo = args.find((a) => !a.startsWith("-"));
+  const { apiUrl, apiKey, webUrl } = getConfig();
+  const url = repo
+    ? `${apiUrl.replace(/\/$/, "")}/decisions?repo=${encodeURIComponent(repo)}`
+    : `${apiUrl.replace(/\/$/, "")}/decisions`;
+
+  console.log(`\x1b[35m🧠 Extracting architectural decisions${repo ? ` for "${repo}"` : ""}...\x1b[0m\n`);
+
+  const res = await fetch(url, { headers: { "X-API-Key": apiKey } });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+
+  const data = (await res.json()) as {
+    decisions: Array<{
+      title: string;
+      decision: string;
+      alternatives: string[];
+      reason: string;
+      session_id: string;
+      turn_index: number;
+    }>;
+    sessions_analyzed: number;
+  };
+
+  if (data.decisions.length === 0) {
+    console.log(`No architectural decisions found${repo ? ` for "${repo}"` : ""}.`);
+    return;
+  }
+
+  console.log(`Found \x1b[1m${data.decisions.length}\x1b[0m decisions across ${data.sessions_analyzed} sessions\n`);
+  console.log("━".repeat(60));
+
+  for (const d of data.decisions) {
+    console.log(`\n\x1b[32m✅ ${d.title}\x1b[0m`);
+    console.log(`   \x1b[1mDecision:\x1b[0m ${d.decision}`);
+    if (d.reason) console.log(`   \x1b[2mWhy:\x1b[0m ${d.reason}`);
+    if (d.alternatives?.length > 0) {
+      console.log(`   \x1b[2mAlternatives:\x1b[0m ${d.alternatives.join(", ")}`);
+    }
+    const base = (webUrl || apiUrl).replace(/\/$/, "").replace(/:3000$/, "");
+    const link = `${base}/sessions/${encodeURIComponent(d.session_id)}?turn=${d.turn_index + 1}`;
+    console.log(`   \x1b[36m→ ${link}\x1b[0m  \x1b[2m(turn ${d.turn_index + 1} in session ${d.session_id.slice(0, 8)}…)\x1b[0m`);
+  }
+  console.log();
+}
+
 export function runData(args: string[]): void {
   const subcommand = args[0];
 
@@ -348,10 +394,11 @@ Usage:
   orchid data <command>
 
 Commands:
-  list      List all stored sessions
-  show      Show a session transcript
-  search    Search across sessions
-  summary   AI-generated session summary`);
+  list        List all stored sessions
+  show        Show a session transcript
+  search      Search across sessions
+  summary     AI-generated session summary
+  decisions   AI-extracted architectural decision log`);
     return;
   }
 
@@ -376,6 +423,12 @@ Commands:
       break;
     case "summary":
       dataSummary(args.slice(1)).catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      });
+      break;
+    case "decisions":
+      dataDecisions(args.slice(1)).catch((err) => {
         console.error(`Error: ${err.message}`);
         process.exit(1);
       });
