@@ -14,6 +14,8 @@
 - Sync watcher: `startSyncWatcher(transcriptPath, metadata)` returns `{ stop, finalSync }` — import from cli/src/sync.ts
 - Session ID derived from transcript filename via `sessionIdFromPath()` in cli/src/sync.ts
 - Uses global `fetch` (Node 18+) for HTTP calls — no external HTTP deps needed
+- `fetchSession(id)` in data.ts fetches a single session by ID (GET /sessions/:id) — reuse for any single-session query
+- JSONL parsing: `parseTranscriptTurns()` handles multiple Claude Code formats (type/role/message.role) and extracts text from string or content-block arrays
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -109,4 +111,20 @@
   - `runData()` now has a subcommand router (switch on args[0]) — US-012/013 should add cases for "show" and "search"
   - `fetchSessions()` helper can be reused for US-013 search (just add ?q= param)
   - Session interface defined in data.ts — can be shared if needed by other modules
+---
+
+## 2026-03-28 - US-012
+- Implemented `orchid data show` command with three modes: raw transcript, --turns, --summary
+- Added `fetchSession(id)` helper for single-session GET /sessions/:id
+- Added `parseTranscriptTurns()` to parse Claude Code JSONL into role+text turns
+- `--turns` prints each turn as `[role]\ntext\n`
+- `--summary` prints metadata header + first user message + last assistant message
+- Clear error on session not found (server returns 404, CLI shows "Session not found: <id>")
+- Added "show" case to runData subcommand router
+- Files changed: cli/src/commands/data.ts
+- **Learnings for future iterations:**
+  - `fetchSession(id)` can be reused by any future command needing a single session
+  - Claude Code JSONL has multiple message formats: `{type:"human"}`, `{role:"user"}`, `{message:{role:...}}` — parseTranscriptTurns handles all
+  - Content blocks can be strings or arrays of `{type:"text", text:"..."}` objects — `extractTextContent()` normalizes both
+  - The `dataShow()` function is async, wired into runData switch the same way as dataList
 ---
