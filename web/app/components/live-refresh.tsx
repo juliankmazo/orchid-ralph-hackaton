@@ -3,16 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export function LiveRefresh() {
+export function LiveRefresh({ interval = 10_000 }: { interval?: number }) {
   const router = useRouter();
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const id = setInterval(() => {
       router.refresh();
-    }, 10_000);
+    }, interval);
 
-    return () => clearInterval(interval);
-  }, [router]);
+    return () => clearInterval(id);
+  }, [router, interval]);
 
   return null;
 }

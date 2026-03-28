@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "./components/sidebar";
+import { KeyboardNav } from "./components/keyboard-nav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +36,10 @@ export default function RootLayout({
       <body className="h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
         <div className="flex h-full">
           <Sidebar />
-          <main className="flex-1 overflow-auto">{children}</main>
+          <main className="flex-1 overflow-auto">
+            <KeyboardNav />
+            {children}
+          </main>
         </div>
       </body>
     </html>

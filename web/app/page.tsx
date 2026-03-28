@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSessions, getStats, timeAgo } from "./lib/api";
+import { LiveRefresh } from "./components/live-refresh";
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === "active";
@@ -97,6 +98,7 @@ export default async function SessionsPage() {
 
   return (
     <div className="animate-fade-in">
+      <LiveRefresh interval={15000} />
       {/* Header */}
       <header
         className="sticky top-0 z-10 flex items-center justify-between px-6 h-[52px] border-b backdrop-blur-sm"
