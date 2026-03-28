@@ -97,3 +97,16 @@
   - The `.then(exit)` pattern ensures the process waits for the async final PUT before terminating
   - Signal handling: signals are forwarded to child, which triggers child exit, which triggers finalSync — no need to duplicate finalSync in signal handlers
 ---
+
+## 2026-03-28 - US-011
+- Implemented `orchid data list` command that fetches GET /sessions and prints a table
+- Rewrote cli/src/commands/data.ts from stub to full subcommand router with `list` support
+- Table columns: ID (short, 12 chars), USER, DIR (basename), TIME (relative), MESSAGES (? messages since list endpoint excludes transcript), STATUS
+- Includes data --help showing available subcommands (list, show, search)
+- Files changed: cli/src/commands/data.ts
+- **Learnings for future iterations:**
+  - GET /sessions excludes transcript field — so message count always shows "? messages" in list view
+  - `runData()` now has a subcommand router (switch on args[0]) — US-012/013 should add cases for "show" and "search"
+  - `fetchSessions()` helper can be reused for US-013 search (just add ?q= param)
+  - Session interface defined in data.ts — can be shared if needed by other modules
+---
