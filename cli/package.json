@@ -7,7 +7,7 @@
     "orchid": "./bin/orchid"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node build.mjs",
     "dev": "tsx src/main.ts",
     "test:e2e": "tsx test/e2e.ts"
   },
