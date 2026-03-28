@@ -2,6 +2,7 @@ import { runClaude } from "./commands/claude";
 import { runData } from "./commands/data";
 import { runReview } from "./commands/review";
 import { runExplain } from "./commands/explain";
+import { runConfig } from "./commands/config";
 
 const VERSION = "0.1.0";
 
@@ -12,6 +13,7 @@ Usage:
 
 Commands:
   claude    Launch Claude Code and sync the conversation
+  config    Set up CLI configuration (~/.orchid/config.json)
   data      Query stored sessions (list, show, search, summary)
   review    Conversation-aware code review
   explain   Explain why a commit was made
@@ -19,11 +21,6 @@ Commands:
 Options:
   --help      Show this help message
   --version   Show version
-
-Environment:
-  ORCHID_API_URL   Server URL (required)
-  ORCHID_API_KEY   API key for authentication (required)
-  OPENAI_API_KEY   For AI-powered review summaries (optional)
 `;
 
 function main() {
@@ -45,6 +42,12 @@ function main() {
   switch (command) {
     case "claude":
       runClaude(subArgs);
+      break;
+    case "config":
+      runConfig(subArgs).catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      });
       break;
     case "data":
       runData(subArgs);
