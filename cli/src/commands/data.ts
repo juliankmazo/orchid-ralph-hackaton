@@ -385,6 +385,88 @@ async function dataDecisions(args: string[]): Promise<void> {
   console.log();
 }
 
+async function dataAsk(args: string[]): Promise<void> {
+  const sessionId = args.find((a) => !a.startsWith("-"));
+  if (!sessionId) {
+    console.error("Usage: orchid data ask <session_id> <question>");
+    console.error('       orchid data ask <session_id>   (interactive mode)');
+    process.exit(1);
+  }
+
+  const questionParts = args.slice(1).filter((a) => !a.startsWith("-"));
+  const question = questionParts.join(" ");
+
+  const { apiUrl, apiKey } = getConfig();
+  const history: Array<{ role: string; content: string }> = [];
+
+  async function askQuestion(q: string): Promise<string> {
+    const url = `${apiUrl.replace(/\/$/, "")}/sessions/${encodeURIComponent(sessionId!)}/chat`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-API-Key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ question: q, history }),
+    });
+
+    if (res.status === 503) {
+      throw new Error("Chat not available (server needs OPENAI_API_KEY)");
+    }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+
+    const data = (await res.json()) as { answer: string };
+    return data.answer;
+  }
+
+  if (question) {
+    // Single question mode
+    console.log(`\x1b[35m🌸 Asking about session ${shortId(sessionId)}...\x1b[0m\n`);
+    const answer = await askQuestion(question);
+    console.log(answer);
+    console.log();
+    return;
+  }
+
+  // Interactive mode
+  const readline = await import("readline");
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  console.log(`\x1b[35m🌸 Orchid Chat — Session ${shortId(sessionId)}\x1b[0m`);
+  console.log(`\x1b[90mAsk questions about this conversation. Type "exit" to quit.\x1b[0m\n`);
+
+  const prompt = () => {
+    rl.question("\x1b[36m❯ \x1b[0m", async (input) => {
+      const trimmed = input.trim();
+      if (!trimmed || trimmed === "exit" || trimmed === "quit") {
+        rl.close();
+        return;
+      }
+
+      try {
+        history.push({ role: "user", content: trimmed });
+        process.stdout.write("\x1b[90mThinking...\x1b[0m\r");
+        const answer = await askQuestion(trimmed);
+        process.stdout.write("             \r"); // clear "Thinking..."
+        console.log(`\n\x1b[35m🌸\x1b[0m ${answer}\n`);
+        history.push({ role: "assistant", content: answer });
+      } catch (err) {
+        console.error(`\x1b[31mError: ${(err as Error).message}\x1b[0m`);
+      }
+
+      prompt();
+    });
+  };
+
+  prompt();
+}
+
 export function runData(args: string[]): void {
   const subcommand = args[0];
 
@@ -399,7 +481,8 @@ Commands:
   show        Show a session transcript
   search      Search across sessions
   summary     AI-generated session summary
-  decisions   AI-extracted architectural decision log`);
+  decisions   AI-extracted architectural decision log
+  ask         Ask questions about a session's conversation`);
     return;
   }
 
@@ -430,6 +513,12 @@ Commands:
       break;
     case "decisions":
       dataDecisions(args.slice(1)).catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      });
+      break;
+    case "ask":
+      dataAsk(args.slice(1)).catch((err) => {
         console.error(`Error: ${err.message}`);
         process.exit(1);
       });
