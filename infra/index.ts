@@ -17,15 +17,11 @@ const sshKeys = keyFiles.map((file) => {
   });
 });
 
-// Collect all public keys for authorized_keys
-const allPubKeys = keyFiles
-  .map((file) => fs.readFileSync(path.join(keysDir, file), "utf8").trim())
-  .join("\n");
-
-// Cloud-init: install everything the agent needs
+// Cloud-init shared across both droplets
 const userData = `#!/bin/bash
 set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
+export HOME=/root
 
 # System updates
 apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
@@ -34,16 +30,19 @@ apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Optio
 apt-get install -y curl git build-essential unzip jq htop tmux
 
 # Node.js 22 via fnm
-export HOME=/root
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="/root/.local/share/fnm:$PATH"
 eval "$(fnm env --shell bash)"
 fnm install 22
 fnm default 22
 
-# Make fnm available in future sessions
+# PATH setup for login shells
+cat >> /root/.profile << 'PROFILE'
+export PATH="/root/.local/share/fnm:/root/.local/bin:$PATH"
+eval "$(fnm env --shell bash)"
+PROFILE
 cat >> /root/.bashrc << 'BASHRC'
-export PATH="/root/.local/share/fnm:$PATH"
+export PATH="/root/.local/share/fnm:/root/.local/bin:$PATH"
 eval "$(fnm env --shell bash)"
 BASHRC
 
@@ -74,11 +73,25 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt-get update && apt-get install -y caddy
 
-echo "Orchid agent VPS setup complete" > /root/READY
+echo "READY" > /root/READY
 `;
 
-// Droplet — 8 CPU, 16GB RAM, good for running the agent + deploying apps
-const droplet = new digitalocean.Droplet("orchid-agent", {
+const inboundRules: digitalocean.types.input.FirewallInboundRule[] = [
+  { protocol: "tcp", portRange: "22", sourceAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "tcp", portRange: "80", sourceAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "tcp", portRange: "443", sourceAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "tcp", portRange: "3000", sourceAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "icmp", sourceAddresses: ["0.0.0.0/0", "::/0"] },
+];
+
+const outboundRules: digitalocean.types.input.FirewallOutboundRule[] = [
+  { protocol: "tcp", portRange: "1-65535", destinationAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "udp", portRange: "1-65535", destinationAddresses: ["0.0.0.0/0", "::/0"] },
+  { protocol: "icmp", destinationAddresses: ["0.0.0.0/0", "::/0"] },
+];
+
+// --- AGENT DROPLET (runs Claude Code / Codex in a loop) ---
+const agentDroplet = new digitalocean.Droplet("orchid-agent", {
   name: "orchid-agent",
   image: "ubuntu-24-04-x64",
   region: digitalocean.Region.NYC1,
@@ -89,56 +102,34 @@ const droplet = new digitalocean.Droplet("orchid-agent", {
   backups: false,
 });
 
-// Firewall — SSH + HTTP/HTTPS + all outbound
-const firewall = new digitalocean.Firewall("orchid-agent", {
+const agentFirewall = new digitalocean.Firewall("orchid-agent", {
   name: "orchid-agent",
-  dropletIds: [droplet.id.apply((id) => parseInt(id))],
-  inboundRules: [
-    {
-      protocol: "tcp",
-      portRange: "22",
-      sourceAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "tcp",
-      portRange: "80",
-      sourceAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "tcp",
-      portRange: "443",
-      sourceAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "tcp",
-      portRange: "3000",
-      sourceAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "icmp",
-      sourceAddresses: ["0.0.0.0/0", "::/0"],
-    },
-  ],
-  outboundRules: [
-    {
-      protocol: "tcp",
-      portRange: "1-65535",
-      destinationAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "udp",
-      portRange: "1-65535",
-      destinationAddresses: ["0.0.0.0/0", "::/0"],
-    },
-    {
-      protocol: "icmp",
-      destinationAddresses: ["0.0.0.0/0", "::/0"],
-    },
-  ],
+  dropletIds: [agentDroplet.id.apply((id) => parseInt(id))],
+  inboundRules,
+  outboundRules,
+});
+
+// --- DEPLOY DROPLET (hosts the web app, exposed to internet) ---
+const deployDroplet = new digitalocean.Droplet("orchid-deploy", {
+  name: "orchid-deploy",
+  image: "ubuntu-24-04-x64",
+  region: digitalocean.Region.NYC1,
+  size: "s-4vcpu-8gb", // $48/mo — 4 vCPU, 8GB RAM, 160GB SSD
+  sshKeys: sshKeys.map((k) => k.fingerprint),
+  userData: userData,
+  monitoring: true,
+  backups: false,
+});
+
+const deployFirewall = new digitalocean.Firewall("orchid-deploy", {
+  name: "orchid-deploy",
+  dropletIds: [deployDroplet.id.apply((id) => parseInt(id))],
+  inboundRules,
+  outboundRules,
 });
 
 // Outputs
-export const ip = droplet.ipv4Address;
-export const sshCommand = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${droplet.ipv4Address}`;
-export const dropletId = droplet.id;
-export const dropletStatus = droplet.status;
+export const agentIp = agentDroplet.ipv4Address;
+export const deployIp = deployDroplet.ipv4Address;
+export const sshAgent = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${agentDroplet.ipv4Address}`;
+export const sshDeploy = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${deployDroplet.ipv4Address}`;

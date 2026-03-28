@@ -21,10 +21,13 @@ cp orchid-agent ~/.ssh/orchid-agent
 chmod 600 ~/.ssh/orchid-agent
 
 # 2. SSH in
-ssh -i ~/.ssh/orchid-agent root@174.138.46.71
+ssh -i ~/.ssh/orchid-agent root@204.48.31.85
 ```
 
-**Pre-installed**: Node.js 22, pnpm, uv (Python), Docker, GitHub CLI, Claude Code, Codex CLI, Caddy.
+**Agent instance** (runs Claude/Codex in a loop): `root@204.48.31.85` — 8 vCPU, 16GB RAM
+**Deploy instance** (hosts the web app): `root@24.144.97.81` — 4 vCPU, 8GB RAM
+
+**Pre-installed on both**: Node.js 22, pnpm, uv (Python), Docker, GitHub CLI, Claude Code, Codex CLI, Caddy.
 
 **Adding a new teammate**: Drop their `.pub` key in `infra/keys/<name>.pub` and run `pulumi up` from `infra/`.
 
