@@ -9,6 +9,8 @@
 - CLI binary at cli/bin/orchid requires `../dist/main.js` (build first with `npm run build`)
 - CLI config (ORCHID_API_URL, ORCHID_API_KEY) lives in cli/src/config.ts — import getConfig() when needed
 - Git metadata collection: import `collectGitMetadata()` from cli/src/commands/claude.ts — returns GitMetadata interface
+- Transcript detection: `findTranscriptFile(startTimeMs)` searches ~/.claude/projects/ for newest .jsonl created after given timestamp
+- Module state: `getDetectedTranscriptPath()` returns the detected transcript path (set by polling in runClaude)
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -50,4 +52,20 @@
   - `collectGitMetadata()` is exported so US-008/009/010 can reuse it for the sync PUT body
   - `execGit()` helper swallows errors and returns "" — safe for non-git directories
   - The `GitMetadata` interface is exported for type reuse in sync/watcher code
+---
+
+## 2026-03-28 - US-008
+- Implemented `orchid claude` child process spawning and transcript detection
+- Files changed: cli/src/commands/claude.ts (rewritten to add spawn + polling)
+- Spawns `claude <args>` with `stdio: 'inherit'` for full interactivity
+- Polls `~/.claude/projects/` every 2s using recursive search for newest .jsonl file created after spawn
+- Uses `birthtimeMs` to identify files created after process start
+- Exports `findTranscriptFile()` and `getDetectedTranscriptPath()` for sync watcher (US-009/010)
+- Forwards SIGINT/SIGTERM to child, exits with child's exit code
+- One final transcript detection attempt on child exit
+- **Learnings for future iterations:**
+  - `spawn("claude", args, { stdio: "inherit" })` keeps Node event loop alive — no need for async main
+  - `birthtimeMs` is reliable on macOS for detecting newly created files; works on modern Linux too
+  - `detectedTranscriptPath` is module-level state — US-009 sync watcher should access via `getDetectedTranscriptPath()`
+  - Signal forwarding: forward SIGINT/SIGTERM to child, and on child exit re-raise signal if terminated by signal
 ---

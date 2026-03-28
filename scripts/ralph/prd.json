@@ -128,7 +128,7 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Claude Code writes session transcripts to ~/.claude/projects/<hashed-path>/<session-id>.jsonl"
     },
     {
