@@ -404,16 +404,20 @@ app.post("/sessions/:id/chat", requireApiKey, async (req: Request, res: Response
           text = typeof obj.content === "string" ? obj.content : JSON.stringify(obj.content);
         }
         if (role && text) {
-          turns.push({ role, text: text.slice(0, 1000) });
+          turns.push({ role, text });
         }
       } catch {
         // skip
       }
     }
 
-    const conversationText = turns
+    // Build conversation text, keeping full content but capping total at ~100k chars to fit model context
+    let conversationText = turns
       .map((t) => `[${t.role}]: ${t.text}`)
       .join("\n\n");
+    if (conversationText.length > 100000) {
+      conversationText = conversationText.slice(0, 100000) + "\n\n[... transcript truncated ...]";
+    }
 
     // Build chat messages with optional history
     const messages: Array<{ role: string; content: string }> = [

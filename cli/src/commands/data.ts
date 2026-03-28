@@ -424,7 +424,7 @@ async function dataAsk(args: string[]): Promise<void> {
 
   if (question) {
     // Single question mode
-    console.log(`\x1b[35m🌸 Asking about session ${shortId(sessionId)}...\x1b[0m\n`);
+    console.log(`\x1b[35m🌸 Asking about session ${sessionId.slice(0, 12)}...\x1b[0m\n`);
     const answer = await askQuestion(question);
     console.log(answer);
     console.log();
@@ -438,7 +438,7 @@ async function dataAsk(args: string[]): Promise<void> {
     output: process.stdout,
   });
 
-  console.log(`\x1b[35m🌸 Orchid Chat — Session ${shortId(sessionId)}\x1b[0m`);
+  console.log(`\x1b[35m🌸 Orchid Chat — Session ${sessionId.slice(0, 12)}\x1b[0m`);
   console.log(`\x1b[90mAsk questions about this conversation. Type "exit" to quit.\x1b[0m\n`);
 
   const prompt = () => {
