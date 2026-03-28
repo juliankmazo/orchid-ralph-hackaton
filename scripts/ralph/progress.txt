@@ -5,6 +5,9 @@
 - Deploy via rsync to /opt/orchid-server/, then `npm install && npm run build && pm2 restart orchid-server`
 - SSH to droplet: `ssh -i <key> root@24.144.97.81`
 - The PRD listed IP 174.138.46.71 but actual droplet IP is 24.144.97.81
+- CLI lives under cli/ — mirrors server structure: TypeScript, commonjs, ES2022 target
+- CLI binary at cli/bin/orchid requires `../dist/main.js` (build first with `npm run build`)
+- CLI config (ORCHID_API_URL, ORCHID_API_KEY) lives in cli/src/config.ts — import getConfig() when needed
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -20,4 +23,17 @@
   - The PRD IP (174.138.46.71) was wrong; always check DO API for actual droplet IPs
   - Postgres was already installed on the droplet image (Ubuntu 24.04)
   - pm2 ecosystem.config.js is at /opt/orchid-server/ on the droplet
+---
+
+## 2026-03-28 - US-006
+- Created CLI scaffold: TypeScript project under cli/ with command routing
+- Files created: cli/package.json, cli/tsconfig.json, cli/bin/orchid, cli/src/main.ts, cli/src/config.ts, cli/src/commands/claude.ts, cli/src/commands/data.ts
+- `orchid --help` prints commands (claude, data), `orchid --version` prints 0.1.0
+- Config requires ORCHID_API_URL and ORCHID_API_KEY env vars (exits with error if missing)
+- Typecheck passes, build produces dist/
+- **Learnings for future iterations:**
+  - Mirrored server's tsconfig (commonjs, ES2022) for consistency
+  - bin/orchid uses `require("../dist/main.js")` — must build before running via bin
+  - Stub commands (claude.ts, data.ts) are ready for subsequent stories to flesh out
+  - getConfig() in config.ts centralizes env var reading — future commands should import it
 ---
