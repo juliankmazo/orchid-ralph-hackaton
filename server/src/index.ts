@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import pool from "./db";
 import { runMigrations } from "./migrate";
 
@@ -14,6 +14,43 @@ app.get("/health", async (_req, res) => {
     res.json({ status: "ok" });
   } catch {
     res.json({ status: "ok", db: "disconnected" });
+  }
+});
+
+function requireApiKey(req: Request, res: Response, next: NextFunction): void {
+  const key = req.headers["x-api-key"];
+  if (!API_KEY || key !== API_KEY) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
+}
+
+app.put("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { user_name, user_email, working_dir, git_remotes, branch, tool, transcript, status } = req.body;
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO sessions (id, user_name, user_email, working_dir, git_remotes, branch, tool, transcript, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         user_name   = EXCLUDED.user_name,
+         user_email  = EXCLUDED.user_email,
+         working_dir = EXCLUDED.working_dir,
+         git_remotes = EXCLUDED.git_remotes,
+         branch      = EXCLUDED.branch,
+         tool        = EXCLUDED.tool,
+         transcript  = EXCLUDED.transcript,
+         status      = EXCLUDED.status,
+         updated_at  = NOW()
+       RETURNING *`,
+      [id, user_name, user_email, working_dir, JSON.stringify(git_remotes), branch, tool, transcript, status || "active"]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("PUT /sessions/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
