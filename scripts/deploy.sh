@@ -16,7 +16,7 @@ $SSH 'cd /opt/orchid-server && npm run build --silent && pm2 restart orchid-serv
 
 # Deploy web
 echo "→ Deploying web UI..."
-rsync -avz --exclude node_modules --exclude .next --exclude dist \
+rsync -avz --delete --exclude node_modules --exclude .next --exclude dist \
   -e "ssh -i $KEY -o StrictHostKeyChecking=no" \
   web/ $HOST:/opt/orchid-web/ --quiet
 $SSH 'cd /opt/orchid-web && NEXT_PUBLIC_API_URL=http://24.144.97.81:3000 NEXT_PUBLIC_API_KEY=orchid-poc-api-key-2024 npm run build --silent 2>/dev/null && pm2 restart orchid-web --silent' 2>/dev/null

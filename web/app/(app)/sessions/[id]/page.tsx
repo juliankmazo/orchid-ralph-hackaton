@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getSession, parseTranscript, timeAgo, formatDuration } from "../../lib/api";
-import { LiveRefresh } from "../../components/live-refresh";
-import { AISummary } from "../../components/ai-summary";
-import { CopyLink } from "../../components/copy-link";
+import { getSession, parseTranscript, timeAgo, formatDuration } from "../../../lib/api";
+import { LiveRefresh } from "../../../components/live-refresh";
+import { AISummary } from "../../../components/ai-summary";
+import { CopyLink } from "../../../components/copy-link";
 
 function MetadataItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -148,7 +148,7 @@ export default async function SessionPage({
           <p className="text-lg font-medium mb-2" style={{ color: "var(--text-primary)" }}>
             Session not found
           </p>
-          <Link href="/" className="text-sm underline" style={{ color: "var(--accent)" }}>
+          <Link href="/dashboard" className="text-sm underline" style={{ color: "var(--accent)" }}>
             Back to sessions
           </Link>
         </div>
@@ -173,7 +173,7 @@ export default async function SessionPage({
         }}
       >
         <Link
-          href="/"
+          href="/dashboard"
           className="flex items-center gap-1 text-[12px] font-medium transition-colors hover:opacity-80"
           style={{ color: "var(--text-tertiary)" }}
         >

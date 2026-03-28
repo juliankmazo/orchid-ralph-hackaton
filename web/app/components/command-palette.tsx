@@ -88,7 +88,7 @@ export function CommandPalette() {
 
   function getItems() {
     const staticItems = [
-      { label: "Sessions", desc: "View all sessions", href: "/" },
+      { label: "Sessions", desc: "View all sessions", href: "/dashboard" },
       { label: "Search", desc: "Search conversations", href: "/search" },
       { label: "Activity", desc: "Team activity", href: "/activity" },
     ];
