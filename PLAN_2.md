@@ -8,7 +8,7 @@ When AI writes code, the conversations behind it are invisible. A reviewer sees 
 
 ## Goal
 
-Make AI conversations a first-class artifact of code review. Any developer should be able to look at a commit or PR and see the conversations *related to it* — and eventually ask questions about them.
+Code tells you what exists. Git tells you when it changed and who changed it. But neither tells you *why*. The conversations between developers and AI tools are the missing piece — they capture the reasoning, the tradeoffs, the decisions. We want to capture those conversations and make them available to anyone — or any agent — that needs them: a teammate reviewing a PR, a new developer trying to understand a module, or an agent picking up where someone left off.
 
 ## Key Principles
 
@@ -16,6 +16,7 @@ Make AI conversations a first-class artifact of code review. Any developer shoul
 - **Multi-repo by default**: A single conversation can span multiple repos and PRs. A developer working on a feature might touch backend and frontend in one session. The data model supports this from day one.
 - **Periodic sync, not post-hoc**: Conversations stream to the server as they happen, not after the session ends. This makes the data crash-safe and enables live viewing.
 - **Zero friction capture**: Just prefix your command with `orchid`. No config, no hooks, no setup.
+- **Simplest thing that works**: No clever sync algorithms, no incremental diffs — if re-uploading the whole transcript every 5 seconds works, do that. Optimize later.
 
 ## Core Idea
 
@@ -31,10 +32,9 @@ This launches Claude Code (or any AI tool) and periodically syncs the conversati
 
 1. User runs `orchid claude` in a **feature folder** (which may contain multiple repos as subfolders)
 2. Orchid launches Claude Code as a child process
-3. A background watcher monitors the JSONL transcript file in `~/.claude/projects/`
-4. Every few seconds (or on new messages), new transcript chunks are pushed to the Orchid server
-5. Orchid watches for commits across **all git repos** under the working directory and links them to the session
-6. On exit, a final sync ensures everything is captured
+3. Orchid identifies the JSONL transcript file for **this specific session** (in `~/.claude/projects/`)
+4. A background watcher periodically reads the transcript and pushes it to the Orchid server — the simplest approach that works (even if that means re-uploading the whole sessopm each time)
+5. On exit, a final sync ensures everything is captured
 
 ### Multi-Repo Sessions
 
@@ -52,9 +52,65 @@ orchid claude      ← one session, two repos, two PRs
 ```
 
 This means:
-- **Sessions link to multiple repos** — not just one
-- **Sessions link to multiple commits across repos** — timestamps help correlate which parts of the conversation relate to which commits
-- **PR views aggregate** — when viewing PR #42 on the backend, you see the full conversation that also touched the frontend, with the relevant parts highlighted
+
+- **A session can touch multiple repos** — the conversation is the unit, not the repo
+- **Links are semantic, not stored** — we don't maintain a mapping between sessions and PRs in the database. The session has timestamps, commits have timestamps, and git knows which commits belong to which PR. The read layer connects the dots at query time.
+- **PR views aggregate** — when viewing PR #42 on the backend, the read layer finds conversations that overlap in time with the PR's commits and shows them, including parts that touched other repos
+
+## Use Cases
+
+- **Code review** — Reviewer opens a PR and sees the conversations that produced each commit. Instead of guessing why something was done a certain way, they read the actual discussion.
+- **Agent-assisted review** — An agent reviews a PR for you, but instead of only reading the diff, it also reads the conversations behind it. It gives deeper feedback because it understands the intent, not just the code.
+- **Picking up someone else's work** — A teammate started a feature, had a long conversation with Claude, then went on vacation. You read the conversation and understand exactly where they were and what decisions they made.
+- **Agents continuing work** — An agent needs to finish a feature that another session started. It reads the previous conversations to understand what was tried, what failed, what the user actually wanted.
+- **Onboarding** — New developer wants to understand why the auth system works the way it does. They find the conversations from when it was built — the requirements, the alternatives, the tradeoffs.
+- **Debugging** — Something is broken and you're staring at weird code. You pull up the conversation that produced it and see the full context.
+- **Team visibility** — Engineering lead wants to understand how AI is being used across the team. Which repos, how often, what kinds of tasks.
+
+## Surfaces
+
+### 1. CLI — `orchid data` (agent-friendly interface)
+
+The CLI is not just for capture — it's also the way agents query conversation data. Any agent (Claude Code, Codex, custom scripts) can shell out to `orchid data` commands.
+
+```
+orchid data list                          — list stored sessions
+orchid data search "why websockets"       — search across all conversations
+orchid data show <session_id>             — dump a specific session
+```
+
+This means an AI-assisted code review is just:
+
+```
+> Review PR #42. Use `orchid data` to check the conversations behind it.
+```
+
+Claude Code runs the commands, reads the results, and gives a review that understands *why* things were done. No MCP server, no special integration — the CLI is the agent interface.
+
+### 2. Web UI — the home base
+
+- See all your conversations and your teammates' conversations
+- Browse by repo, by person, by time
+- Click into any session and read the full conversation
+- Live view when someone is actively working
+
+### 3. GitHub PR comment — passive context
+
+When a PR is opened, Orchid automatically posts a comment listing the related conversations, each linking back to the web UI:
+
+```
+🌸 Orchid: 3 AI conversations related to this PR
+
+- Session by @andres (2h 14m, 47 messages) — View conversation
+- Session by @julian (35m, 12 messages) — View conversation
+- Session by @andres (10m, 6 messages) — View conversation
+```
+
+### 4. GitHub PR Q&A — the killer feature
+
+Someone asks a question in a PR comment: "why did we go with WebSockets instead of SSE?"
+
+Orchid detects the question (via `@orchid why WebSockets?`), reads the related conversations, finds the relevant parts, and replies with an answer citing specific messages. The reviewer gets an answer without leaving GitHub, without asking the author.
 
 ## Live Session Viewing
 
@@ -68,42 +124,6 @@ Because transcripts sync periodically, we get **live viewing for free**:
 
 A dedicated **Node.js server** with **Postgres**, hosted on a single DigitalOcean droplet (or EC2).
 
-### Why Own Server vs. Supabase
-
-- **Simpler**: One process, one DB — no vendor abstractions in the way
-- **Full control**: Custom WebSocket logic for live streaming, custom auth, custom query layer
-- **Cheaper**: A $12/mo droplet handles the hackathon and beyond
-- **Fewer moving parts**: No Supabase client SDK, no row-level security policies to debug
-
-### API Shape
-
-```
-POST   /api/sessions                    — Create a new session (returns session_id)
-POST   /api/sessions/:id/chunks         — CLI pushes new transcript chunks
-PATCH  /api/sessions/:id                — Update session metadata (status, end time)
-POST   /api/sessions/:id/commits        — Link a commit SHA to the session
-
-GET    /api/sessions/:id                — Full session with transcript
-GET    /api/repos/:owner/:repo/sessions — Sessions for a repo
-GET    /api/repos/:owner/:repo/pulls/:pr — Sessions linked to a PR
-WS     /api/sessions/:id/live           — WebSocket for live session viewing
-```
-
-### Database Schema (Postgres)
-
-```sql
-repos (id, owner, name, remote_url, created_at)
-sessions (id, tool, status, working_dir, started_at, ended_at)
-session_repos (session_id, repo_id)              -- many-to-many
-chunks (id, session_id, seq, data, received_at)
-commits (sha, repo_id, session_id, committed_at)
-```
-
-- A session can span **multiple repos** (via `session_repos`)
-- Commits link back to both their repo and the session
-- Timestamps on chunks and commits allow correlating conversation turns with specific commits
-- Transcripts are stored as ordered chunks — the server appends, the web UI reassembles
-
 ### Dumb Write, Smart Read
 
 The write path does **nothing clever** — it just appends timestamped transcript chunks to the database. No processing, no linking, no parsing. The raw conversation is immutable data.
@@ -112,68 +132,101 @@ All intelligence happens at **read time**: linking conversations to commits (via
 
 ## Phases
 
-### Phase 1: CLI + Server
+### Phase 1: Capture + Store (the core loop)
+
+The minimum to prove the idea works. After this phase, conversations are being captured and stored.
 
 **Server**
+
 - Node.js + Express/Fastify + Postgres
-- REST endpoints for session/chunk/commit CRUD
-- WebSocket endpoint for live session streaming
+- REST endpoints: create session, push chunks
 - No auth for POC — server is open / uses a simple API key
-- Deploy on DigitalOcean (single droplet: Node.js + Postgres)
+- Deploy on DigitalOcean (single droplet: Node.js + Postgres). You will have root access to this droplet
 
 **CLI: `orchid claude`** (and `orchid codex`, etc.)
-- Detect current git repo and remote URL
-- Create session on server (`POST /api/sessions`)
+
+- Detect working directory
+- Collect metadata: git remotes from the working directory and any subfolders, git user name/email, current branch(es)
 - Launch the wrapped tool
 - Watch for JSONL transcript file
-- Periodic sync to server (every ~5s or on new messages)
-- Detect `git commit` events and link commit SHAs to the session
+- Periodic sync to server — each sync is an idempotent put (create or update the session, including metadata + transcript)
 - Final sync on exit
 
-**CLI: `orchid sync <session>`** (fallback)
-- Manually push a past session that wasn't captured via wrapper
-- For "I forgot to use `orchid`" situations
+### Phase 2: Query + Read (prove the data is useful)
 
-### Phase 2: Web UI
+After this phase, any agent can use the stored conversations. This is where value gets validated — a developer can already use Claude Code + `orchid data` to do conversation-aware code reviews.
 
-Served from the same Node.js server (or a separate Next.js app if needed).
+**CLI: `orchid data`**
+
+- `orchid data list` — list stored sessions, shows who started each one (from git user config), when, how many messages, and status
+
+```
+orchid data list
+#12  andres   2h ago   "Add auth middleware"   (47 messages, active)
+#11  julian   5h ago   "Fix payment flow"      (23 messages, done)
+#10  andres   1d ago   "Refactor DB layer"     (89 messages, done)
+```
+
+- `orchid data show <session_id>` — dump a full conversation (raw JSONL by default)
+- `orchid data search "why websockets"` — search across all conversations
+
+**Output formatting (nice to have):**
+
+- `orchid data show 12` — full raw output (default, best for agents to process)
+- `orchid data show 12 --summary` — just user prompts + one-line summary of each AI response
+- `orchid data show 12 --turns` — human-readable, turn by turn, trimmed
+
+Raw output is the priority. Agents like Claude and Codex can handle raw data fine — they can dump it to files and search through it. Formatting helpers are polish for human use.
+
+**Example workflow — agent-assisted review with just Phase 1 + 2:**
+
+```
+# Teammate works on a feature, conversation is captured
+orchid claude
+
+# Later, you're reviewing their PR
+claude
+
+> Review PR #42. Run `orchid data search` to find conversations
+> related to the changes. Use that context to explain why decisions
+> were made and flag anything that looks off.
+```
+
+No web UI, no GitHub integration — just two CLIs and a server. Already more useful than any code review tool today.
+
+### Phase 3: Web UI (make it visual)
 
 **Core Views:**
 
-1. **Dashboard** (`/`) — Repos with recent AI activity
-2. **Repo View** (`/:repo`) — Commit timeline with session indicators
-3. **PR View** (`/:repo/pulls/:number`) — All conversations behind a PR
-4. **Session View** (`/:repo/sessions/:id`) — Full conversation replay
-   - Live-updating via WebSocket if session is still active
-5. **Commit View** (`/:repo/commits/:sha`) — Diff + conversation side-by-side
+1. **Session list** — all conversations, browsable by time / person
+2. **Session viewer** — full conversation replay
+  - Live-updating if session is still active (polling to start, WebSocket later)
+3. **PR view** — all conversations related to a PR (linked via timestamps + git history)
+4. **Commit view** — diff + conversation side-by-side
 
-**The Killer Feature: "Ask about this PR"**
-- Reviewer types a question about the PR
-- Claude answers using the actual AI conversations as context
-- Cited responses pointing to specific messages in the transcript
+### Phase 4: GitHub Integration (connect to the workflow)
 
-### Phase 3: GitHub Integration + Polish
-
-- GitHub Action that auto-comments conversation summaries on PRs
-- Browser extension to embed conversation context in GitHub PR pages
+- Auto-post a PR comment listing related conversations with links to web UI
+- `@orchid` bot: ask a question on a PR, get an answer sourced from the conversations
 - Team features (shared repos, access controls)
-- Conversation search across all sessions
+
+### Phase 5: Polish
+
+- Browser extension to embed conversation context in GitHub PR pages
 - Analytics (AI usage, session duration, cost estimates)
+- `orchid sync <session>` — manually push a past session (fallback for "I forgot to use orchid")
 
 ## Tech Stack
 
 ```
-CLI:        TypeScript (wrapper + file watcher + HTTP/WS sync client)
+CLI:        TypeScript (wrapper + file watcher + HTTP sync client)
 Server:     Node.js + Express or Fastify
 Database:   Postgres
-Realtime:   WebSockets (native, via ws or built-in Fastify support)
-Frontend:   Next.js App Router + Tailwind (or served from same server)
-Hosting:    DigitalOcean droplet (Node.js + Postgres on same box)
+Realtime:   Polling for POC (WebSockets later)
+Frontend:   Next.js App Router + Tailwind
+Hosting:    Single DigitalOcean droplet (everything on one box)
 ```
 
-## Open Questions
+**POC deployment**: Everything runs on a single droplet with root access — Node.js server, Postgres, frontend, all on the same box. Nginx as a reverse proxy if needed, open whatever ports are necessary. Keep it simple — no containers, no separate services, no CI/CD. SSH in, deploy, done.
 
-- What's the right sync interval? 5s? On every new message? Debounced?
-- How to handle multiple simultaneous sessions?
-- Should `orchid` also capture terminal output, or just the JSONL transcript?
-- How to link commits to sessions reliably when multiple tools are running?
+
