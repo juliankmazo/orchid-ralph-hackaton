@@ -12,13 +12,15 @@ The core insight: code review is incomplete when AI writes the code. Reviewers d
 
 The AI agent runs 24/7 on a DigitalOcean droplet (8 vCPU, 16GB RAM, Ubuntu 24.04).
 
+All credentials (SSH private key, API keys) are in the `.secrets` file at the repo root.
+
 ```bash
-# 1. Get the private key from a teammate (infra/keys/orchid-agent)
-# 2. Save it locally
+# 1. Copy the SSH key from .secrets to ~/.ssh/
+#    (grab the private key block from .secrets and save it)
 cp orchid-agent ~/.ssh/orchid-agent
 chmod 600 ~/.ssh/orchid-agent
 
-# 3. SSH in
+# 2. SSH in
 ssh -i ~/.ssh/orchid-agent root@174.138.46.71
 ```
 
