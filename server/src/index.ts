@@ -1,5 +1,6 @@
 import express from "express";
 import pool from "./db";
+import { runMigrations } from "./migrate";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -16,11 +17,21 @@ app.get("/health", async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Orchid server listening on port ${PORT}`);
-  if (!API_KEY) {
-    console.warn("WARNING: API_KEY is not set");
+async function start() {
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("Migration failed:", err);
   }
-});
+
+  app.listen(PORT, () => {
+    console.log(`Orchid server listening on port ${PORT}`);
+    if (!API_KEY) {
+      console.warn("WARNING: API_KEY is not set");
+    }
+  });
+}
+
+start();
 
 export default app;
