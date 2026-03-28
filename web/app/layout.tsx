@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "Orchid — AI Conversation Context",
   description:
     "See the conversations behind your code. Orchid captures AI coding sessions and makes them available to reviewers, teammates, and agents.",
+  icons: {
+    icon: "/orchid.svg",
+  },
 };
 
 export default function RootLayout({

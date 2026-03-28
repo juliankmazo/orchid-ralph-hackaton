@@ -73,10 +73,20 @@ while true; do
     # `script -q -c CMD FILE` allocates a PTY, runs CMD, logs to FILE.
     cd "$REPODIR"
     PROMPT_FILE=$(mktemp /tmp/orchid-prompt-XXXXXX.txt)
+    EXIT_FILE=$(mktemp /tmp/orchid-exit-XXXXXX.txt)
     printf '%s' "$PROMPT" > "$PROMPT_FILE"
-    script -q -e -f -c "claude --model opus --permission-mode bypassPermissions -p \"\$(cat $PROMPT_FILE)\"" "$LOGFILE"
-    EXIT_CODE=$?
-    rm -f "$PROMPT_FILE"
+
+    if [[ "$OSTYPE" == darwin* ]]; then
+        # macOS: script syntax is `script -q file command...`
+        # macOS script always returns 0, so capture exit code via temp file
+        script -q "$LOGFILE" bash -c "claude --model opus --permission-mode bypassPermissions -p \"\$(cat $PROMPT_FILE)\"; echo \$? > $EXIT_FILE"
+        EXIT_CODE=$(cat "$EXIT_FILE" 2>/dev/null || echo 1)
+    else
+        # Linux: script -q -e -c "command" file
+        script -q -e -f -c "claude --model opus --permission-mode bypassPermissions -p \"\$(cat $PROMPT_FILE)\"" "$LOGFILE"
+        EXIT_CODE=$?
+    fi
+    rm -f "$PROMPT_FILE" "$EXIT_FILE"
 
     echo ""
     echo "[watchdog] Claude exited with code ${EXIT_CODE} at $(date)"
