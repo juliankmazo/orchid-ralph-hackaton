@@ -11,6 +11,9 @@
 - Git metadata collection: import `collectGitMetadata()` from cli/src/commands/claude.ts — returns GitMetadata interface
 - Transcript detection: `findTranscriptFile(startTimeMs)` searches ~/.claude/projects/ for newest .jsonl created after given timestamp
 - Module state: `getDetectedTranscriptPath()` returns the detected transcript path (set by polling in runClaude)
+- Sync watcher: `startSyncWatcher(transcriptPath, metadata)` returns `{ stop, finalSync }` — import from cli/src/sync.ts
+- Session ID derived from transcript filename via `sessionIdFromPath()` in cli/src/sync.ts
+- Uses global `fetch` (Node 18+) for HTTP calls — no external HTTP deps needed
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -68,4 +71,18 @@
   - `birthtimeMs` is reliable on macOS for detecting newly created files; works on modern Linux too
   - `detectedTranscriptPath` is module-level state — US-009 sync watcher should access via `getDetectedTranscriptPath()`
   - Signal forwarding: forward SIGINT/SIGTERM to child, and on child exit re-raise signal if terminated by signal
+---
+
+## 2026-03-28 - US-009
+- Implemented periodic sync watcher that PUTs transcript to server every 5 seconds
+- Created cli/src/sync.ts with `startSyncWatcher()`, `sessionIdFromPath()`, and `syncToServer()`
+- Modified cli/src/commands/claude.ts to start sync watcher when transcript is detected
+- Files changed: cli/src/sync.ts (new), cli/src/commands/claude.ts (modified)
+- **Learnings for future iterations:**
+  - `startSyncWatcher()` returns `{ stop, finalSync }` — US-010 should call `finalSync()` on exit instead of `stop()`
+  - Session ID is the basename of the JSONL file without extension (e.g., `abc123` from `abc123.jsonl`)
+  - Uses Node's global `fetch` (available in Node 18+) — no need for axios or node-fetch
+  - `getConfig()` is called inside `syncToServer()` on every call — env vars are read each time (fine for POC)
+  - Sync watcher does an immediate first sync, then every 5s thereafter
+  - Errors in sync are caught and logged to stderr — they never crash the watcher or parent process
 ---
