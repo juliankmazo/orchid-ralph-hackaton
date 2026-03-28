@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession, parseTranscript, timeAgo, formatDuration } from "../../lib/api";
 import { LiveRefresh } from "../../components/live-refresh";
+import { AISummary } from "../../components/ai-summary";
 
 function MetadataItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -248,6 +249,9 @@ export default async function SessionPage({
           </div>
         </div>
       )}
+
+      {/* AI Summary */}
+      <AISummary sessionId={session.id} />
 
       {/* Conversation */}
       <div className="px-6 py-6 max-w-3xl mx-auto">
