@@ -272,16 +272,36 @@ export default async function SessionPage({
         )}
 
         {isActive && (
-          <div
-            className="mt-8 flex items-center gap-2 text-[12px] px-4 py-3 rounded-lg border"
-            style={{
-              borderColor: "var(--green)",
-              background: "var(--green-muted)",
-              color: "var(--green)",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full animate-pulse-dot" style={{ background: "var(--green)" }} />
-            This session is still active. Page refreshes automatically every 10 seconds.
+          <div className="mt-8 space-y-4">
+            {/* Typing indicator */}
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold"
+                style={{ background: "var(--orchid-pink-muted)", color: "var(--orchid-pink)" }}
+              >
+                AI
+              </div>
+              <div
+                className="px-4 py-3 rounded-lg flex items-center gap-1.5"
+                style={{ background: "var(--bg-secondary)", borderLeft: "2px solid var(--orchid-pink)" }}
+              >
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+            </div>
+
+            <div
+              className="flex items-center gap-2 text-[12px] px-4 py-3 rounded-lg border"
+              style={{
+                borderColor: "var(--green)",
+                background: "var(--green-muted)",
+                color: "var(--green)",
+              }}
+            >
+              <span className="w-2 h-2 rounded-full animate-pulse-dot" style={{ background: "var(--green)" }} />
+              This session is still active. Page refreshes automatically every 10 seconds.
+            </div>
           </div>
         )}
       </div>
