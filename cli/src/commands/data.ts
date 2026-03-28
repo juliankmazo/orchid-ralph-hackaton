@@ -299,6 +299,42 @@ async function dataSearch(args: string[]): Promise<void> {
   }
 }
 
+async function dataSummary(args: string[]): Promise<void> {
+  const sessionId = args.find((a) => !a.startsWith("-"));
+  if (!sessionId) {
+    console.error("Usage: orchid data summary <session_id>");
+    process.exit(1);
+  }
+
+  const { apiUrl, apiKey } = getConfig();
+  const url = `${apiUrl.replace(/\/$/, "")}/sessions/${encodeURIComponent(sessionId)}/summary`;
+
+  console.log(`\x1b[35m🌸 Generating AI summary...\x1b[0m\n`);
+
+  try {
+    const res = await fetch(url, {
+      headers: { "X-API-Key": apiKey },
+    });
+
+    if (res.status === 503) {
+      console.error("\x1b[33mAI summaries not available (server needs OPENAI_API_KEY)\x1b[0m");
+      return;
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`${res.status}: ${text}`);
+    }
+
+    const data = (await res.json()) as { summary: string };
+    console.log(data.summary);
+    console.log();
+  } catch (err) {
+    console.error(`Error: ${(err as Error).message}`);
+    process.exit(1);
+  }
+}
+
 export function runData(args: string[]): void {
   const subcommand = args[0];
 
@@ -311,7 +347,8 @@ Usage:
 Commands:
   list      List all stored sessions
   show      Show a session transcript
-  search    Search across sessions`);
+  search    Search across sessions
+  summary   AI-generated session summary`);
     return;
   }
 
@@ -330,6 +367,12 @@ Commands:
       break;
     case "search":
       dataSearch(args.slice(1)).catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      });
+      break;
+    case "summary":
+      dataSummary(args.slice(1)).catch((err) => {
         console.error(`Error: ${err.message}`);
         process.exit(1);
       });
