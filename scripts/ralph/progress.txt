@@ -1,0 +1,23 @@
+## Codebase Patterns
+- Server project lives under `server/` with TypeScript, Express, and pg
+- Use `npx tsc --noEmit` from `server/` directory to typecheck
+- Database connection uses `pg.Pool` with `DATABASE_URL` env var
+- Express app exported from `src/index.ts`, db pool from `src/db.ts`
+
+# Ralph Progress Log
+Started: Sat Mar 28 12:50:55 PDT 2026
+---
+
+## 2026-03-28 - US-001
+- Implemented: Node.js + TypeScript + Express server scaffold with Postgres connection
+- Files changed:
+  - server/package.json (project config, dependencies)
+  - server/tsconfig.json (TypeScript config)
+  - server/src/index.ts (Express app, health endpoint, PORT/API_KEY env vars)
+  - server/src/db.ts (Postgres pool via DATABASE_URL)
+- **Learnings for future iterations:**
+  - Express app listens on PORT env var (default 3000)
+  - API_KEY env var read but not enforced yet (used in later stories)
+  - Health endpoint at GET /health tries a DB query but returns ok even if DB is down (graceful)
+  - `npx tsc --noEmit` from server/ directory for typecheck
+---
