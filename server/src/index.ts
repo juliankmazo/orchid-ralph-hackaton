@@ -54,6 +54,46 @@ app.put("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
   }
 });
 
+app.get("/sessions", requireApiKey, async (req: Request, res: Response) => {
+  try {
+    const q = req.query.q as string | undefined;
+    let result;
+    if (q) {
+      result = await pool.query(
+        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status
+         FROM sessions
+         WHERE transcript ILIKE $1
+         ORDER BY started_at DESC`,
+        [`%${q}%`]
+      );
+    } else {
+      result = await pool.query(
+        `SELECT id, user_name, user_email, working_dir, git_remotes, branch, tool, started_at, updated_at, status
+         FROM sessions
+         ORDER BY started_at DESC`
+      );
+    }
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET /sessions error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query("SELECT * FROM sessions WHERE id = $1", [req.params.id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Session not found" });
+      return;
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("GET /sessions/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 async function start() {
   try {
     await runMigrations();
