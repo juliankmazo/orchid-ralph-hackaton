@@ -494,9 +494,10 @@ app.get("/sessions/:id/commits", requireApiKey, async (req: Request, res: Respon
       return;
     }
 
-    if (!GITHUB_TOKEN) {
-      res.json({ commits: [], message: "GITHUB_TOKEN not configured — cannot fetch commits" });
-      return;
+    // Build GitHub API headers — works without token for public repos (60 req/hr), with token for private (5000 req/hr)
+    const ghHeaders: Record<string, string> = { Accept: "application/vnd.github+json" };
+    if (GITHUB_TOKEN) {
+      ghHeaders.Authorization = `Bearer ${GITHUB_TOKEN}`;
     }
 
     // Look back 1 hour before started_at to catch commits made before orchid's first sync
@@ -534,12 +535,7 @@ app.get("/sessions/:id/commits", requireApiKey, async (req: Request, res: Respon
       if (until) apiUrl += `&until=${until}`;
 
       try {
-        const ghRes = await fetch(apiUrl, {
-          headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: "application/vnd.github+json",
-          },
-        });
+        const ghRes = await fetch(apiUrl, { headers: ghHeaders });
 
         if (!ghRes.ok) continue;
 
@@ -558,12 +554,7 @@ app.get("/sessions/:id/commits", requireApiKey, async (req: Request, res: Respon
           try {
             const detailRes = await fetch(
               `https://api.github.com/repos/${owner}/${repo}/commits/${commit.sha}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${GITHUB_TOKEN}`,
-                  Accept: "application/vnd.github+json",
-                },
-              }
+              { headers: ghHeaders }
             );
             if (detailRes.ok) {
               const detail = await detailRes.json() as {
