@@ -36,6 +36,34 @@ ssh -i ~/.ssh/orchid-agent root@174.138.46.71
 - [Architecture](./architecture.md) - Chosen architecture and technical decisions
 - [MVP Plan](./mvp-plan.md) - What to build first
 
+## Using Ralph (Autonomous Agent)
+
+Ralph is a multi-agent pipeline that builds a full project from a one-line idea: spec → build → test → deploy.
+
+**Setup (one-time):**
+1. Write your idea to `IDEA.md`
+2. Set DigitalOcean credentials (`DO_TOKEN`, `DO_SSH_KEY_ID`, `DO_REGISTRY`)
+
+**Run the full pipeline:**
+```bash
+./scripts/ralph/orchestrate.sh
+```
+
+This runs four phases automatically:
+1. **Architect** — generates specs and `prd.json` from `IDEA.md`
+2. **Workers** — parallel agents implement backend, frontend, and infra stories simultaneously
+3. **QA** — runs tests, auto-fixes failures, blocks deploy if broken
+4. **Deploy** — builds a Docker image and deploys to a DigitalOcean Droplet
+
+**Run a single agent loop** (if you already have a `prd.json`):
+```bash
+./scripts/ralph/ralph.sh --tool claude
+```
+
+Ralph picks the highest-priority unfinished story, implements it, commits, and repeats until all stories pass.
+
+---
+
 ## Key Decisions
 
 - **Write path**: Simple. Dump full transcripts to Supabase Storage on session end. No slicing, no processing.
