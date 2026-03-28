@@ -1,66 +1,23 @@
 ## Codebase Patterns
-- Server project lives under `server/` with TypeScript, Express, and pg
-- Use `npx tsc --noEmit` from `server/` directory to typecheck
-- Database connection uses `pg.Pool` with `DATABASE_URL` env var
-- Express app exported from `src/index.ts`, db pool from `src/db.ts`
-- Migrations live in `server/migrations/` as plain SQL, run via `src/migrate.ts` on startup
-- Use `CREATE TABLE IF NOT EXISTS` for idempotent migrations
-- Server startup is async via `start()` function in index.ts
-- Auth middleware `requireApiKey` in index.ts — reuse for all protected endpoints
-- Upsert pattern: `INSERT...ON CONFLICT (id) DO UPDATE SET...RETURNING *`
-- Use ILIKE with `%query%` for case-insensitive text search in Postgres
-- Exclude large columns (transcript) from list endpoints by enumerating SELECT columns
+- Server is deployed to 24.144.97.81 (orchid-deploy droplet), managed by pm2
+- DATABASE_URL: postgresql://orchid:orchid_poc_2024@localhost:5432/orchid
+- API_KEY: orchid-poc-api-key-2024
+- Deploy via rsync to /opt/orchid-server/, then `npm install && npm run build && pm2 restart orchid-server`
+- SSH to droplet: `ssh -i <key> root@24.144.97.81`
+- The PRD listed IP 174.138.46.71 but actual droplet IP is 24.144.97.81
 
-# Ralph Progress Log
-Started: Sat Mar 28 12:50:55 PDT 2026
----
-
-## 2026-03-28 - US-001
-- Implemented: Node.js + TypeScript + Express server scaffold with Postgres connection
-- Files changed:
-  - server/package.json (project config, dependencies)
-  - server/tsconfig.json (TypeScript config)
-  - server/src/index.ts (Express app, health endpoint, PORT/API_KEY env vars)
-  - server/src/db.ts (Postgres pool via DATABASE_URL)
+## 2026-03-28 20:07 - US-005
+- Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
+- Installed Node.js 22, pm2 on droplet (Postgres 16 was pre-installed)
+- Created orchid Postgres user and database
+- Rsync'd server code, built, started with pm2 ecosystem config
+- Configured pm2 startup for auto-restart on boot
+- Verified health endpoint returns 200 {"status":"ok"}
+- Verified PUT /sessions/:id works with API key auth
+- Files changed: server/DEPLOY.md (new), scripts/ralph/prd.json, scripts/ralph/progress.txt
 - **Learnings for future iterations:**
-  - Express app listens on PORT env var (default 3000)
-  - API_KEY env var read but not enforced yet (used in later stories)
-  - Health endpoint at GET /health tries a DB query but returns ok even if DB is down (graceful)
-  - `npx tsc --noEmit` from server/ directory for typecheck
----
-
-## 2026-03-28 - US-002
-- Implemented: DB migration for sessions table with all required columns
-- Files changed:
-  - server/migrations/001_sessions.sql (CREATE TABLE IF NOT EXISTS with all columns)
-  - server/src/migrate.ts (reads and executes migration SQL on startup)
-  - server/src/index.ts (async start() function calls runMigrations before listen)
-- **Learnings for future iterations:**
-  - Migration runner reads SQL from `../migrations/` relative to `__dirname` (works for both dev and built dist/)
-  - Server startup is now async — wrap in `start()` function pattern
-  - Status column uses CHECK constraint for 'active'|'done' enum
-  - started_at and updated_at default to NOW(), so inserts don't need to specify them
----
-
-## 2026-03-28 - US-003
-- Implemented: PUT /sessions/:id endpoint with upsert and API key auth
-- Files changed:
-  - server/src/index.ts (added requireApiKey middleware, PUT /sessions/:id with INSERT...ON CONFLICT upsert)
-- **Learnings for future iterations:**
-  - Auth middleware `requireApiKey` checks `X-API-Key` header against `API_KEY` env var, returns 401 if missing/wrong
-  - Upsert uses `INSERT...ON CONFLICT (id) DO UPDATE SET...RETURNING *` pattern
-  - git_remotes is JSONB so it needs `JSON.stringify()` when passing to pg query
-  - Status defaults to 'active' if not provided in request body
-  - All future authenticated endpoints should reuse `requireApiKey` middleware
----
-
-## 2026-03-28 - US-004
-- Implemented: GET /sessions (list, excluding transcript) and GET /sessions/:id (full session with transcript)
-- Files changed:
-  - server/src/index.ts (added two GET endpoints before start() function)
-- **Learnings for future iterations:**
-  - GET /sessions excludes transcript by explicitly listing columns in SELECT (not SELECT *)
-  - ILIKE with `%query%` used for case-insensitive text search on transcript column
-  - GET /sessions/:id returns 404 with `{ error: "Session not found" }` when no row matches
-  - Route order matters: GET /sessions must be defined before GET /sessions/:id to avoid `:id` capturing "sessions"
+  - The .secrets file has the SSH private key - extract it to a temp file with chmod 600 before use
+  - The PRD IP (174.138.46.71) was wrong; always check DO API for actual droplet IPs
+  - Postgres was already installed on the droplet image (Ubuntu 24.04)
+  - pm2 ecosystem.config.js is at /opt/orchid-server/ on the droplet
 ---

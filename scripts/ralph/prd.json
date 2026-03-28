@@ -70,17 +70,17 @@
       "title": "Deploy server to DigitalOcean droplet",
       "description": "As a developer, I need the server running on the DO droplet so that the CLI has a real endpoint to sync to.",
       "acceptanceCriteria": [
-        "Server is running on the droplet at 174.138.46.71 (SSH key and credentials are in .secrets at repo root)",
+        "Server is running on the droplet at 24.144.97.81 (SSH key and credentials are in .secrets at repo root)",
         "Postgres is installed and running on the same droplet",
         "Server process is managed by pm2 or similar (auto-restarts on crash)",
-        "GET http://174.138.46.71:3000/health returns 200",
+        "GET http://24.144.97.81:3000/health returns 200",
         "API_KEY and DATABASE_URL are set as environment variables on the droplet",
         "Deployment steps are documented in server/DEPLOY.md",
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "SSH key and droplet IP are in .secrets at repo root. Use them to deploy."
+      "passes": true,
+      "notes": "SSH key and droplet IP are in .secrets at repo root. Actual droplet IP is 24.144.97.81 (orchid-deploy)."
     },
     {
       "id": "US-006",
