@@ -6,6 +6,8 @@
 - Migrations live in `server/migrations/` as plain SQL, run via `src/migrate.ts` on startup
 - Use `CREATE TABLE IF NOT EXISTS` for idempotent migrations
 - Server startup is async via `start()` function in index.ts
+- Auth middleware `requireApiKey` in index.ts — reuse for all protected endpoints
+- Upsert pattern: `INSERT...ON CONFLICT (id) DO UPDATE SET...RETURNING *`
 
 # Ralph Progress Log
 Started: Sat Mar 28 12:50:55 PDT 2026
@@ -36,4 +38,16 @@ Started: Sat Mar 28 12:50:55 PDT 2026
   - Server startup is now async — wrap in `start()` function pattern
   - Status column uses CHECK constraint for 'active'|'done' enum
   - started_at and updated_at default to NOW(), so inserts don't need to specify them
+---
+
+## 2026-03-28 - US-003
+- Implemented: PUT /sessions/:id endpoint with upsert and API key auth
+- Files changed:
+  - server/src/index.ts (added requireApiKey middleware, PUT /sessions/:id with INSERT...ON CONFLICT upsert)
+- **Learnings for future iterations:**
+  - Auth middleware `requireApiKey` checks `X-API-Key` header against `API_KEY` env var, returns 401 if missing/wrong
+  - Upsert uses `INSERT...ON CONFLICT (id) DO UPDATE SET...RETURNING *` pattern
+  - git_remotes is JSONB so it needs `JSON.stringify()` when passing to pg query
+  - Status defaults to 'active' if not provided in request body
+  - All future authenticated endpoints should reuse `requireApiKey` middleware
 ---
