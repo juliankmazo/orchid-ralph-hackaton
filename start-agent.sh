@@ -28,7 +28,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Iteration $i of $MAX_ITERATIONS — $(date)"
   echo "======================================================="
 
-  OUTPUT=$(claude --dangerously-skip-permissions --print < "$REPO_ROOT/AGENT.md" 2>&1 | tee /dev/stderr) || true
+  OUTPUT=$(claude --dangerously-skip-permissions --print < "$REPO_ROOT/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
 
   # Check if all tasks are done
   if echo "$OUTPUT" | grep -q "<done>ALL_TASKS_COMPLETE</done>"; then
