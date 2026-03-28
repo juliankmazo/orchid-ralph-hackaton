@@ -21,9 +21,11 @@ Orchid captures AI coding conversations and makes them available to anyone who n
 ```bash
 orchid claude                          # Launch Claude + capture conversation
 orchid data list                       # List all sessions
-orchid data show <session_id>          # View full transcript
+orchid data show <id> [--turns]        # View full transcript
 orchid data search "why websockets"    # Search across all conversations
+orchid data summary <id>               # AI-generated session summary
 orchid review <branch>                 # AI-powered conversation-aware review
+orchid explain <commit-sha>            # Explain why a commit was made
 ```
 
 ### Web UI
