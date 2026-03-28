@@ -31,5 +31,6 @@ export function getConfig() {
     process.exit(1);
   }
 
-  return { apiUrl, apiKey };
+  const webUrl = process.env.ORCHID_WEB_URL || file.web_url || apiUrl.replace(/:3000$/, "");
+  return { apiUrl, apiKey, webUrl };
 }

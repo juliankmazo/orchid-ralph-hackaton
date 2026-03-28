@@ -1,0 +1,22 @@
+### Phase 5.5: Decision Log (ADR Surface)
+
+Every repo has a set of architectural decisions buried in AI conversations — "why Postgres over MongoDB", "why WebSockets instead of SSE", "why we rewrote the auth layer". These are invisible today.
+
+**The feature:** Orchid scans all sessions for a repo and generates an **AI-powered Decision Log** — a structured list of key architectural decisions, each linked back to the exact moment in the conversation where it was decided.
+
+**How it works:**
+
+1. `GET /repos/:repo/decisions` — server sends all transcripts for the repo to the LLM with a prompt: *"Extract every architectural decision made in these conversations. For each decision: title, the chosen option, alternatives that were rejected, and the reason. Return the turn index where the decision was made."*
+
+2. Each decision stores a `session_id` + `turn_index` so we can link directly to it.
+
+3. **Web UI — Decision Log page** (`/repos/:repo/decisions`):
+   - List of ADR-style cards: `✅ Chose Postgres over MongoDB — "Supabase gives us auth + DB in one service"`
+   - Each card has a **"See the moment →"** link that opens the session viewer scrolled to that exact turn
+   - Session viewer supports deep-linking via `?turn=42` — scrolls to and highlights that message
+
+4. **CLI:** `orchid decisions [repo]` — prints the decision log to stdout, with links to the web UI for each item.
+
+**Deep-link format:** `/sessions/:id?turn=42` — the session viewer highlights turn 42 and scrolls it into view on load.
+
+**Why this is valuable:** A new developer (or agent) joining a repo can read the Decision Log and understand *why* the codebase is the way it is — in 2 minutes instead of 2 hours of archaeology.
