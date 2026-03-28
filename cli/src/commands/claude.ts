@@ -2,6 +2,7 @@ import { execSync, spawn, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import { startSyncWatcher } from "../sync";
 
 export interface GitMetadata {
   user_name: string;
@@ -159,18 +160,22 @@ export function runClaude(args: string[]): void {
     env: process.env,
   });
 
+  let syncWatcher: ReturnType<typeof startSyncWatcher> | null = null;
+
   // Poll for transcript file every 2 seconds
   const pollInterval = setInterval(() => {
     if (!detectedTranscriptPath) {
       detectedTranscriptPath = findTranscriptFile(startTimeMs);
       if (detectedTranscriptPath) {
         process.stderr.write(`[orchid] transcript detected: ${detectedTranscriptPath}\n`);
+        syncWatcher = startSyncWatcher(detectedTranscriptPath, metadata);
       }
     }
   }, 2000);
 
   child.on("error", (err) => {
     clearInterval(pollInterval);
+    if (syncWatcher) syncWatcher.stop();
     process.stderr.write(`[orchid] error spawning claude: ${err.message}\n`);
     process.exit(1);
   });
@@ -183,7 +188,13 @@ export function runClaude(args: string[]): void {
       detectedTranscriptPath = findTranscriptFile(startTimeMs);
       if (detectedTranscriptPath) {
         process.stderr.write(`[orchid] transcript detected on exit: ${detectedTranscriptPath}\n`);
+        syncWatcher = startSyncWatcher(detectedTranscriptPath, metadata);
       }
+    }
+
+    // Final sync handled by US-010 — for now just stop the watcher and exit
+    if (syncWatcher) {
+      syncWatcher.stop();
     }
 
     if (signal) {
