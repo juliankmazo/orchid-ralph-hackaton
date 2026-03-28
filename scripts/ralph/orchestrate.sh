@@ -1,19 +1,24 @@
 #!/bin/bash
-# orchestrate.sh — Full pipeline: Architect → Workers → QA → Deploy
-# Usage: ./orchestrate.sh [--skip-architect] [--skip-deploy]
+# orchestrate.sh — Full pipeline: Critic → Workers
+# Usage: ./orchestrate.sh [--skip-critic] [--skip-deploy]
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 RALPH="$SCRIPT_DIR/ralph.sh"
 
-SKIP_ARCHITECT=false
+# Load .env if present
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a; source "$REPO_ROOT/.env"; set +a
+fi
+
+SKIP_CRITIC=false
 SKIP_DEPLOY=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --skip-architect) SKIP_ARCHITECT=true; shift ;;
-    --skip-deploy)    SKIP_DEPLOY=true;    shift ;;
+    --skip-critic)  SKIP_CRITIC=true;  shift ;;
+    --skip-deploy)  SKIP_DEPLOY=true;  shift ;;
     *) shift ;;
   esac
 done
@@ -24,22 +29,58 @@ echo "║  Ralph Multi-Agent Pipeline                      ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
-# ── Phase 1: Architect ──────────────────────────────────────────────────────
-if [ "$SKIP_ARCHITECT" = false ]; then
-  echo "=== Phase 1: Architect (spec generation) ==="
-  OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/agents/ARCHITECT.md" 2>&1 | tee /dev/stderr) || true
-  if ! echo "$OUTPUT" | grep -q "<promise>SPECS_READY</promise>"; then
+# ── Preflight ───────────────────────────────────────────────────────────────
+if [ ! -f "$REPO_ROOT/PLAN.md" ]; then
+  echo "ERROR: PLAN.md not found at repo root."
+  echo "Create PLAN.md with the product goal before running the pipeline."
+  exit 1
+fi
+
+if [ ! -f "$SCRIPT_DIR/prd.json" ]; then
+  echo "ERROR: prd.json not found."
+  echo "Generate prd.json from PLAN.md first (ask Claude Code to do this)."
+  exit 1
+fi
+
+# ── Phase 1: Critic ─────────────────────────────────────────────────────────
+if [ "$SKIP_CRITIC" = false ]; then
+  echo "=== Phase 1: Critic (validating prd.json against PLAN.md) ==="
+
+  MAX_CRITIC_ATTEMPTS=2
+  CRITIC_ATTEMPT=0
+  CRITIC_PASSED=false
+
+  while [ $CRITIC_ATTEMPT -lt $MAX_CRITIC_ATTEMPTS ]; do
+    CRITIC_ATTEMPT=$((CRITIC_ATTEMPT + 1))
+    echo "Critic attempt $CRITIC_ATTEMPT of $MAX_CRITIC_ATTEMPTS..."
+
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/agents/CRITIC.md" 2>&1 | tee /dev/stderr) || true
+
+    if echo "$OUTPUT" | grep -q "<promise>CRITIQUE_PASS</promise>"; then
+      CRITIC_PASSED=true
+      break
+    fi
+
     echo ""
-    echo "ERROR: Architect did not signal SPECS_READY. Check output above."
+    echo "Critic found gaps (see critique.txt). prd.json needs revision."
+
+    if [ $CRITIC_ATTEMPT -lt $MAX_CRITIC_ATTEMPTS ]; then
+      echo "Review critique.txt, update prd.json, then the critic will re-evaluate."
+      echo "Press Enter to re-run the critic, or Ctrl+C to abort and fix manually."
+      read -r
+    fi
+  done
+
+  if [ "$CRITIC_PASSED" = false ]; then
+    echo ""
+    echo "ERROR: prd.json did not pass critique after $MAX_CRITIC_ATTEMPTS attempts."
+    echo "Review scripts/ralph/critique.txt and fix prd.json manually, then re-run with --skip-critic."
     exit 1
   fi
-  echo "Architect complete. prd.json ready."
+
+  echo "Critic passed. prd.json covers the goal."
 else
-  echo "=== Phase 1: Architect (skipped) ==="
-  if [ ! -f "$SCRIPT_DIR/prd.json" ]; then
-    echo "ERROR: --skip-architect requires prd.json to already exist."
-    exit 1
-  fi
+  echo "=== Phase 1: Critic (skipped) ==="
 fi
 echo ""
 
@@ -54,7 +95,7 @@ SHARED_COUNT=$(jq '[.stories[] | select(.lane=="shared" and .passes==false)] | l
 echo "Stories remaining: backend=$BACKEND_COUNT frontend=$FRONTEND_COUNT infra=$INFRA_COUNT shared=$SHARED_COUNT"
 echo ""
 
-# Shared lane runs first (sequentially — DB migrations, env setup)
+# Shared lane runs first (sequentially — DB migrations, env setup, shared types)
 if [ "$SHARED_COUNT" -gt 0 ]; then
   echo "--- Running shared lane first (sequential) ---"
   RALPH_LANE=shared "$RALPH" --tool claude 10 || {
@@ -94,49 +135,7 @@ for pid in "${PIDS[@]}"; do
 done
 
 if [ ${#FAILED_LANES[@]} -gt 0 ]; then
-  echo "WARNING: ${#FAILED_LANES[@]} worker(s) exited non-zero. Continuing to QA anyway..."
-fi
-
-echo ""
-echo "All workers finished."
-echo ""
-
-# ── Phase 3: QA ─────────────────────────────────────────────────────────────
-echo "=== Phase 3: QA ==="
-OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/agents/QA.md" 2>&1 | tee /dev/stderr) || true
-
-if echo "$OUTPUT" | grep -q "<promise>QA_FAIL</promise>"; then
-  echo ""
-  echo "ERROR: QA failed. See progress.txt for details."
-  echo "Fix the issues and re-run with --skip-architect to resume from build phase."
-  exit 1
-fi
-
-echo "QA passed."
-echo ""
-
-# ── Phase 4: Deploy ──────────────────────────────────────────────────────────
-if [ "$SKIP_DEPLOY" = true ]; then
-  echo "=== Phase 4: Deploy (skipped) ==="
-  echo ""
-  echo "Pipeline complete (no deploy). QA passed."
-  exit 0
-fi
-
-echo "=== Phase 4: Deploy to DigitalOcean ==="
-
-# Check required env vars
-if [ -z "$DO_TOKEN" ]; then
-  echo "ERROR: DO_TOKEN not set. Export it or run with --skip-deploy."
-  exit 1
-fi
-
-OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/agents/DEPLOY.md" 2>&1 | tee /dev/stderr) || true
-
-if ! echo "$OUTPUT" | grep -q "<promise>DEPLOY_COMPLETE</promise>"; then
-  echo ""
-  echo "ERROR: Deploy failed. See deploy-report.txt for details."
-  exit 1
+  echo "WARNING: ${#FAILED_LANES[@]} worker(s) exited non-zero."
 fi
 
 echo ""
@@ -144,4 +143,3 @@ echo "╔═══════════════════════�
 echo "║  Pipeline complete!                              ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
-cat "$REPO_ROOT/deploy-report.txt" 2>/dev/null || true
