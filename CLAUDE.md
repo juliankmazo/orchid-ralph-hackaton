@@ -1,3 +1,7 @@
+## CRITICAL:
+
+DO NOT STOP WORKING AND LOOPING EVER. I WILL TELL YOU WHEN TO STOP
+
 ## CRITICAL NOTES:
 
 - Read the ./PLAN.md -> here is where the main goal is

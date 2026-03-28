@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #111118;
+  --bg-tertiary: #1a1a24;
+  --bg-hover: #1e1e2a;
+  --bg-active: #252535;
+  --border: #2a2a3a;
+  --border-subtle: #1e1e2e;
+  --text-primary: #e8e8ed;
+  --text-secondary: #8b8b9e;
+  --text-tertiary: #5c5c72;
+  --accent: #7c5bf5;
+  --accent-hover: #6a4be0;
+  --accent-muted: rgba(124, 91, 245, 0.15);
+  --green: #3ecf71;
+  --green-muted: rgba(62, 207, 113, 0.15);
+  --yellow: #f5c542;
+  --yellow-muted: rgba(245, 197, 66, 0.15);
+  --red: #ef4444;
+  --orchid-pink: #da70d6;
+  --orchid-pink-muted: rgba(218, 112, 214, 0.15);
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--text-primary);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}

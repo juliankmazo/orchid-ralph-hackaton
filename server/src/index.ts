@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import cors from "cors";
 import pool from "./db";
 import { runMigrations } from "./migrate";
 
@@ -6,6 +7,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.API_KEY;
 
+app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/health", async (_req, res) => {
@@ -90,6 +92,24 @@ app.get("/sessions/:id", requireApiKey, async (req: Request, res: Response) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error("GET /sessions/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/stats", requireApiKey, async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as total_sessions,
+        COUNT(*) FILTER (WHERE status = 'active') as active_sessions,
+        COUNT(DISTINCT user_name) as unique_users,
+        MIN(started_at) as first_session,
+        MAX(updated_at) as last_activity
+      FROM sessions
+    `);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("GET /stats error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
