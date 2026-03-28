@@ -1,66 +1,78 @@
 # Orchid
 
-Read PLAN.md
+**Code tells you what. Git tells you when. Orchid tells you why.**
+
+Orchid captures AI coding conversations and makes them available to anyone who needs context — reviewers, teammates, and agents. When AI writes code, the conversations behind it are invisible. Orchid changes that.
+
+## Live Demo
+
+- **Web UI**: http://24.144.97.81
+- **API**: http://24.144.97.81:3000
+
+## How It Works
+
+1. **Capture**: Run `orchid claude` instead of `claude`. The conversation syncs to the cloud in real-time.
+2. **Store**: Conversations are stored with git metadata — branches, remotes, users.
+3. **Review**: See the full conversation behind any code change. Search, browse, or let AI summarize.
+
+## Features
+
+### CLI
+```bash
+orchid claude                          # Launch Claude + capture conversation
+orchid data list                       # List all sessions
+orchid data show <session_id>          # View full transcript
+orchid data search "why websockets"    # Search across all conversations
+orchid review <branch>                 # AI-powered conversation-aware review
+```
+
+### Web UI
+- **Sessions Dashboard** — See all conversations, live status, team stats
+- **Session Viewer** — Full conversation replay with timeline, markdown rendering
+- **AI Summary** — Click-to-generate AI summaries of any conversation
+- **Search** — Full-text search across all conversations
+- **Team Activity** — Per-user session cards, active indicators
+
+### Server API
+- Create/update/delete sessions
+- Full-text search
+- AI-powered summaries (OpenAI)
+- GitHub PR webhook (auto-comment with related conversations)
+
+## Tech Stack
+
+```
+CLI:        TypeScript (wrapper + file watcher + HTTP sync)
+Server:     Node.js + Express + PostgreSQL
+Frontend:   Next.js 16 + Tailwind CSS
+AI:         OpenAI GPT-4o-mini for summaries and reviews
+Hosting:    DigitalOcean droplet + Caddy reverse proxy + PM2
+```
+
+## Quick Start
+
+```bash
+# Set environment
+export ORCHID_API_URL=http://24.144.97.81:3000
+export ORCHID_API_KEY=orchid-poc-api-key-2024
+
+# Install CLI
+cd cli && npm install && npm run build && npm link
+
+# Start coding with conversation capture
+orchid claude
+```
 
 ## Infrastructure
 
-Two DigitalOcean droplets, both Ubuntu 24.04. Same SSH key for both.
+| Instance          | Role                    | IP             | Specs                      |
+| ----------------- | ----------------------- | -------------- | -------------------------- |
+| **orchid-deploy** | Web app + API + DB      | `24.144.97.81` | 4 vCPU, 8GB RAM, 160GB SSD |
 
-| Instance          | Role                                               | IP             | Specs                      | SSH                                            |
-| ----------------- | -------------------------------------------------- | -------------- | -------------------------- | ---------------------------------------------- |
-| **orchid-deploy** | Hosts the web app. The agent deploys here via SSH. | `24.144.97.81` | 4 vCPU, 8GB RAM, 160GB SSD | `ssh -i ~/.ssh/orchid-agent root@24.144.97.81` |
-
-**Pre-installed on both**: Node.js 22, pnpm, uv (Python), Docker, GitHub CLI, Claude Code, Codex CLI, Caddy.
-
-### For the agent
-
-When deploying to the deploy instance, SSH from the agent box:
-
-```bash
-ssh root@24.144.97.81   # from the agent instance, key is already there
-```
-
-Caddy is installed on orchid-deploy for auto-HTTPS reverse proxy. To expose a Next.js app on port 3000:
-
-```bash
-# On orchid-deploy, write a Caddyfile:
-echo "orchid.example.com { reverse_proxy localhost:3000 }" > /etc/caddy/Caddyfile
-systemctl reload caddy
-```
-
-### For humans
-
-All credentials (SSH private key, API keys) are in the `.secrets` file at the repo root.
-
-```bash
-# 1. Get the private key from .secrets and save it
-cp orchid-agent ~/.ssh/orchid-agent
-chmod 600 ~/.ssh/orchid-agent
-
-# 2. SSH into either instance
-ssh -i ~/.ssh/orchid-agent root@204.48.31.85   # agent
-ssh -i ~/.ssh/orchid-agent root@24.144.97.81   # deploy
-```
-
-## Documents
-
-PLAN.md
-
-## Using Ralph (Autonomous Agent)
-
-Ralph is an autonomous agent loop that implements user stories from a `prd.json` spec.
-
-**Setup (one-time):**
-
-1. Generate a `prd.json` from your specs (ask Claude Code to convert your PRD)
-2. Review and iterate on `prd.json` until satisfied
-
-**Run:**
-
-```bash
-./scripts/ralph/ralph.sh --tool claude
-```
-
-Ralph picks the highest-priority unfinished story, implements it, commits, and repeats until all stories pass.
+Services managed by PM2:
+- `orchid-server` — Express API on port 3000
+- `orchid-web` — Next.js on port 3001 (Caddy proxies port 80 → 3001)
 
 ---
+
+*Built for the hackathon. See [PLAN.md](PLAN.md) for the full spec.*
