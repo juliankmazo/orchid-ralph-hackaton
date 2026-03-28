@@ -38,6 +38,18 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    label: "Activity",
+    href: "/activity",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="5" r="2.5" />
+        <circle cx="4" cy="12" r="1.5" />
+        <circle cx="12" cy="12" r="1.5" />
+        <path d="M6 7.5C4.5 8.5 4 10 4 10.5M10 7.5C11.5 8.5 12 10 12 10.5" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar() {
