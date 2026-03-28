@@ -150,7 +150,27 @@ export default function SearchPage() {
           {!searched && (
             <div className="text-center py-12" style={{ color: "var(--text-tertiary)" }}>
               <p className="text-[13px]">Search across all AI conversations.</p>
-              <p className="text-[11px] mt-1">Find discussions about specific decisions, tradeoffs, or features.</p>
+              <p className="text-[11px] mt-2">Find discussions about specific decisions, tradeoffs, or features.</p>
+              <div className="mt-6 flex flex-wrap gap-2 justify-center">
+                {["authentication", "WebSocket", "payment", "database", "CI pipeline"].map((term) => (
+                  <button
+                    key={term}
+                    className="text-[11px] px-2.5 py-1 rounded-full border transition-colors"
+                    style={{
+                      borderColor: "var(--border)",
+                      color: "var(--text-secondary)",
+                    }}
+                    onClick={() => {
+                      setQuery(term);
+                    }}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] mt-4" style={{ color: "var(--text-tertiary)" }}>
+                Tip: Press <kbd className="px-1 py-0.5 rounded text-[9px]" style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>/</kbd> from anywhere to jump to search
+              </p>
             </div>
           )}
         </div>
