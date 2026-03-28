@@ -17,6 +17,7 @@
 - `fetchSession(id)` in data.ts fetches a single session by ID (GET /sessions/:id) — reuse for any single-session query
 - `fetchSessions(query?)` supports optional search — appends `?q=` when query provided
 - JSONL parsing: `parseTranscriptTurns()` handles multiple Claude Code formats (type/role/message.role) and extracts text from string or content-block arrays
+- E2E tests: run with `ORCHID_API_URL=http://24.144.97.81:3000 ORCHID_API_KEY=orchid-poc-api-key-2024 npm run test:e2e` from cli/
 
 ## 2026-03-28 20:07 - US-005
 - Deployed server to DigitalOcean droplet orchid-deploy (24.144.97.81)
@@ -144,4 +145,17 @@
   - Server GET /sessions?q= does ILIKE search on transcript but does NOT return transcript in results
   - To show context snippets, must fetch each session individually (N+1 pattern) — fine for POC scale
   - `extractMatchContext()` does case-insensitive indexOf, extracts ±60 chars around first match, collapses whitespace
+---
+
+## 2026-03-28 - US-014
+- Implemented E2E smoke test at cli/test/e2e.ts proving the full capture→store→query flow
+- Test creates a fake JSONL transcript, PUTs it as a session, then verifies GET /sessions, GET /sessions/:id, GET /sessions?q=, and 404 for missing sessions
+- Added `npm run test:e2e` script using tsx to run the test
+- All 13 assertions pass against the live server at 24.144.97.81:3000
+- Files changed: cli/test/e2e.ts (new), cli/package.json (added test:e2e script), scripts/ralph/prd.json
+- **Learnings for future iterations:**
+  - tsx is already a devDependency in the CLI — use it for running test scripts without a separate test framework
+  - Test uses unique session IDs based on timestamp (`e2e-test-${Date.now()}`) to avoid collisions
+  - The test file is outside tsconfig's `include: ["src/**/*"]` but typechecks fine with tsx/standalone tsc
+  - Global `fetch` works in tsx/Node 18+ without imports — no test deps needed
 ---
