@@ -8,6 +8,8 @@
 - Server startup is async via `start()` function in index.ts
 - Auth middleware `requireApiKey` in index.ts — reuse for all protected endpoints
 - Upsert pattern: `INSERT...ON CONFLICT (id) DO UPDATE SET...RETURNING *`
+- Use ILIKE with `%query%` for case-insensitive text search in Postgres
+- Exclude large columns (transcript) from list endpoints by enumerating SELECT columns
 
 # Ralph Progress Log
 Started: Sat Mar 28 12:50:55 PDT 2026
@@ -50,4 +52,15 @@ Started: Sat Mar 28 12:50:55 PDT 2026
   - git_remotes is JSONB so it needs `JSON.stringify()` when passing to pg query
   - Status defaults to 'active' if not provided in request body
   - All future authenticated endpoints should reuse `requireApiKey` middleware
+---
+
+## 2026-03-28 - US-004
+- Implemented: GET /sessions (list, excluding transcript) and GET /sessions/:id (full session with transcript)
+- Files changed:
+  - server/src/index.ts (added two GET endpoints before start() function)
+- **Learnings for future iterations:**
+  - GET /sessions excludes transcript by explicitly listing columns in SELECT (not SELECT *)
+  - ILIKE with `%query%` used for case-insensitive text search on transcript column
+  - GET /sessions/:id returns 404 with `{ error: "Session not found" }` when no row matches
+  - Route order matters: GET /sessions must be defined before GET /sessions/:id to avoid `:id` capturing "sessions"
 ---
