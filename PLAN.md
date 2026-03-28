@@ -194,7 +194,24 @@ claude
 
 No web UI, no GitHub integration — just two CLIs and a server. Already more useful than any code review tool today.
 
-### Phase 3: Web UI (make it visual)
+### Phase 3: Smart CLI (make the data useful without a UI)
+
+Use the OpenAI API (via Codex SDK or CLI) to add intelligence on top of the raw conversation data. The CLI becomes a smart assistant, not just a data dump.
+
+Some examples of what this could look like — but the goal is to think about what would be genuinely useful and delightful for a developer using this day to day:
+
+- `orchid data search "authentication decisions"` — semantic search, not just text matching. Finds conversations about JWT, OAuth, session tokens even if those exact words aren't in your query
+- `orchid data summary <session_id>` — summarize a long conversation: what was the goal, what decisions were made, what was built
+- `orchid data summary --last-week` — summarize all AI activity across the team for the past week
+- `orchid data related <pr-url>` — find conversations related to a PR and explain the connection
+- `orchid data explain <commit-sha>` — look at the diff, find relevant conversations, explain why the changes were made
+- `orchid review <pr-url>` — pull the PR diff, find related conversations, generate a review that understands the intent behind the code
+
+These are starting points. With an LLM and the full conversation history, there's a lot of room to explore what else would be valuable. What questions do developers actually ask during review? What context do they wish they had? What would make them trust AI-generated code more?
+
+Powered by OpenAI API / Codex SDK — configured via `OPENAI_API_KEY` or similar. The raw `orchid data` commands from Phase 2 still work without an API key.
+
+### Phase 4: Web UI (make it visual)
 
 **Core Views:**
 
@@ -204,13 +221,13 @@ No web UI, no GitHub integration — just two CLIs and a server. Already more us
 3. **PR view** — all conversations related to a PR (linked via timestamps + git history)
 4. **Commit view** — diff + conversation side-by-side
 
-### Phase 4: GitHub Integration (connect to the workflow)
+### Phase 5: GitHub Integration (connect to the workflow)
 
 - Auto-post a PR comment listing related conversations with links to web UI
 - `@orchid` bot: ask a question on a PR, get an answer sourced from the conversations
 - Team features (shared repos, access controls)
 
-### Phase 5: Polish
+### Phase 6: Polish
 
 - Browser extension to embed conversation context in GitHub PR pages
 - Analytics (AI usage, session duration, cost estimates)
