@@ -226,13 +226,17 @@ Powered by OpenAI API / Codex SDK — configured via `OPENAI_API_KEY` or similar
 
 **Core Views:**
 
-1. **Session list** — all conversations, browsable by time / person
-2. **Session viewer** — full conversation replay
+1. **Session list** — all conversations, browsable by time / person ✅
+2. **Session viewer** — full conversation replay ✅
 
-- Live-updating if session is still active (polling to start, WebSocket later)
+- Live-updating if session is still active (polling to start, WebSocket later) ✅
+- Tabbed interface: Conversation / Commits / Ask ✅
 
-3. **PR view** — all conversations related to a PR (linked via timestamps + git history)
-4. **Commit view** — diff + conversation side-by-side
+3. **Commits tab** — shows git commits from GitHub that happened during the session, with diff stats, file changes, and links to GitHub ✅
+4. **Chat tab (Ask)** — ask questions about a session's conversation, AI reasons through the transcript with multi-turn history ✅
+5. **Decision Log** — AI-extracted architectural decisions linked to exact conversation turns ✅
+6. **PR view** — all conversations related to a PR (linked via timestamps + git history)
+7. **Commit view** — full diff + conversation side-by-side
 
 ### Phase 5: GitHub Integration (connect to the workflow)
 
