@@ -16,19 +16,29 @@ The core insight: code review is incomplete when AI writes the code. Reviewers d
 
 ## Using Ralph (Autonomous Agent)
 
-Ralph is an AI agent loop that implements user stories autonomously from spec files.
+Ralph is a multi-agent pipeline that builds a full project from a one-line idea: spec → build → test → deploy.
 
 **Setup (one-time):**
-1. Drop your spec markdown files into `specs/`
-2. Ask Claude Code to generate `prd.json` from the specs
-3. Review and iterate on `prd.json` until satisfied
+1. Write your idea to `IDEA.md`
+2. Set DigitalOcean credentials (`DO_TOKEN`, `DO_SSH_KEY_ID`, `DO_REGISTRY`)
 
-**Run:**
+**Run the full pipeline:**
+```bash
+./scripts/ralph/orchestrate.sh
+```
+
+This runs four phases automatically:
+1. **Architect** — generates specs and `prd.json` from `IDEA.md`
+2. **Workers** — parallel agents implement backend, frontend, and infra stories simultaneously
+3. **QA** — runs tests, auto-fixes failures, blocks deploy if broken
+4. **Deploy** — builds a Docker image and deploys to a DigitalOcean Droplet
+
+**Run a single agent loop** (if you already have a `prd.json`):
 ```bash
 ./scripts/ralph/ralph.sh --tool claude
 ```
 
-Ralph will pick up the highest-priority unfinished story, implement it, commit, and repeat until all stories pass.
+Ralph picks the highest-priority unfinished story, implements it, commits, and repeats until all stories pass.
 
 ---
 
