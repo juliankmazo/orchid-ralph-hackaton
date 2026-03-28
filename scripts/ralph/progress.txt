@@ -86,3 +86,14 @@
   - Sync watcher does an immediate first sync, then every 5s thereafter
   - Errors in sync are caught and logged to stderr — they never crash the watcher or parent process
 ---
+
+## 2026-03-28 - US-010
+- Implemented final sync on exit in `orchid claude`
+- On child process exit, calls `syncWatcher.finalSync()` (which sets status to "done") and waits for it to complete before exiting
+- SIGINT/SIGTERM are forwarded to child; child exit handler performs the final sync
+- Files changed: cli/src/commands/claude.ts
+- **Learnings for future iterations:**
+  - `syncWatcher.finalSync()` already existed in sync.ts — just needed wiring in the exit handler
+  - The `.then(exit)` pattern ensures the process waits for the async final PUT before terminating
+  - Signal handling: signals are forwarded to child, which triggers child exit, which triggers finalSync — no need to duplicate finalSync in signal handlers
+---
