@@ -95,6 +95,9 @@ export default async function SessionsPage() {
   }
 
   const activeSessions = sessions.filter((s) => s.status === "active");
+  const doneSessions = sessions.filter((s) => s.status !== "active");
+  // Sort: active sessions first, then done sessions by date
+  const sortedSessions = [...activeSessions, ...doneSessions];
 
   return (
     <div className="animate-fade-in">
@@ -189,9 +192,9 @@ export default async function SessionsPage() {
                 </span>
               </div>
             )}
-            {sessions.map((session, i) => {
+            {sortedSessions.map((session, i) => {
               // Show "Recent" separator when we transition from active to done
-              const prevSession = i > 0 ? sessions[i - 1] : null;
+              const prevSession = i > 0 ? sortedSessions[i - 1] : null;
               const showRecentSeparator = prevSession?.status === "active" && session.status !== "active";
 
               return (
