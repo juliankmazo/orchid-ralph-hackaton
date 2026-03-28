@@ -8,6 +8,11 @@ You are an autonomous coding agent working on a software project.
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
 3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
 4. Pick the **highest priority** user story where `passes: false`
+
+   **Lane filter (multi-agent mode):** If the environment variable `RALPH_LANE` is set,
+   only pick stories where `lane` matches `$RALPH_LANE` OR `lane` is `"shared"`.
+   Skip stories belonging to other lanes — another worker is handling them.
+   If `RALPH_LANE` is not set, pick any story (single-agent mode).
 5. Implement that single user story
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 7. Update CLAUDE.md files if you discover reusable patterns (see below)
