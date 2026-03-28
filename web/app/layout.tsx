@@ -35,7 +35,9 @@ export default function RootLayout({
     >
       <body className="h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
         <div className="flex h-full">
-          <Sidebar />
+          <div className="hidden md:block">
+            <Sidebar />
+          </div>
           <main className="flex-1 overflow-auto">
             <KeyboardNav />
             {children}
