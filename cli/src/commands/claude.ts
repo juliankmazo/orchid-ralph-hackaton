@@ -192,20 +192,26 @@ export function runClaude(args: string[]): void {
       }
     }
 
-    // Final sync handled by US-010 — for now just stop the watcher and exit
-    if (syncWatcher) {
-      syncWatcher.stop();
-    }
+    const exit = () => {
+      if (signal) {
+        process.kill(process.pid, signal);
+      } else {
+        process.exit(code ?? 1);
+      }
+    };
 
-    if (signal) {
-      // Re-raise the signal so the parent sees the correct termination reason
-      process.kill(process.pid, signal);
+    if (syncWatcher) {
+      process.stderr.write(`[orchid] performing final sync...\n`);
+      syncWatcher.finalSync().then(exit);
     } else {
-      process.exit(code ?? 1);
+      exit();
     }
   });
 
-  // Forward signals to child
-  process.on("SIGINT", () => child.kill("SIGINT"));
-  process.on("SIGTERM", () => child.kill("SIGTERM"));
+  // Forward signals to child and perform final sync
+  const handleSignal = (sig: NodeJS.Signals) => {
+    child.kill(sig);
+  };
+  process.on("SIGINT", () => handleSignal("SIGINT"));
+  process.on("SIGTERM", () => handleSignal("SIGTERM"));
 }
