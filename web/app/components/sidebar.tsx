@@ -50,6 +50,16 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    label: "Decision Log",
+    href: "/decisions",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 2a5 5 0 1 0 0 10A5 5 0 0 0 8 2z" />
+        <path d="M8 6v2.5M8 10.5v.5" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar() {
