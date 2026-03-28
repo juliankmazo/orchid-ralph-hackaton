@@ -25,9 +25,10 @@ const allPubKeys = keyFiles
 // Cloud-init: install everything the agent needs
 const userData = `#!/bin/bash
 set -euxo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 # System updates
-apt-get update && apt-get upgrade -y
+apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 
 # Essentials
 apt-get install -y curl git build-essential unzip jq htop tmux
@@ -54,17 +55,6 @@ curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli-stable.list > /dev/null
 apt-get update && apt-get install -y gh
 
-# Create agent user with sudo
-useradd -m -s /bin/bash -G sudo,docker agent
-echo "agent ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/agent
-mkdir -p /home/agent/.ssh
-cat > /home/agent/.ssh/authorized_keys << 'KEYS'
-${allPubKeys}
-KEYS
-chown -R agent:agent /home/agent/.ssh
-chmod 700 /home/agent/.ssh
-chmod 600 /home/agent/.ssh/authorized_keys
-
 # Claude Code
 npm install -g @anthropic-ai/claude-code
 
@@ -77,7 +67,7 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt-get update && apt-get install -y caddy
 
-echo "Orchid agent VPS setup complete" > /home/agent/READY
+echo "Orchid agent VPS setup complete" > /root/READY
 `;
 
 // Droplet — 8 CPU, 16GB RAM, good for running the agent + deploying apps
@@ -142,6 +132,6 @@ const firewall = new digitalocean.Firewall("orchid-agent", {
 
 // Outputs
 export const ip = droplet.ipv4Address;
-export const sshCommand = pulumi.interpolate`ssh agent@${droplet.ipv4Address}`;
+export const sshCommand = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${droplet.ipv4Address}`;
 export const dropletId = droplet.id;
 export const dropletStatus = droplet.status;

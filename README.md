@@ -19,7 +19,7 @@ cp orchid-agent ~/.ssh/orchid-agent
 chmod 600 ~/.ssh/orchid-agent
 
 # 3. SSH in
-ssh -i ~/.ssh/orchid-agent agent@67.205.147.61
+ssh -i ~/.ssh/orchid-agent root@174.138.46.71
 ```
 
 **Pre-installed**: Node.js 22, pnpm, uv (Python), Docker, GitHub CLI, Claude Code, Codex CLI, Caddy.
