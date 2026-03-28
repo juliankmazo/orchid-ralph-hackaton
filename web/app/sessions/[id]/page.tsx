@@ -239,15 +239,30 @@ export default async function SessionPage({
             <path d="M8 6v2M6.5 11L7.5 8.5M9.5 11L8.5 8.5" />
           </svg>
           <div className="flex flex-wrap gap-2">
-            {session.git_remotes.map((remote: string, i: number) => (
-              <span
-                key={i}
-                className="text-[11px] font-mono px-2 py-0.5 rounded"
-                style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
-              >
-                {remote}
-              </span>
-            ))}
+            {session.git_remotes.map((remote: string, i: number) => {
+              const isGithub = remote.includes("github.com");
+              const url = isGithub ? remote.replace(/\.git$/, "").replace("git@github.com:", "https://github.com/") : null;
+              return url ? (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-mono px-2 py-0.5 rounded transition-colors hover:opacity-80"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--accent)" }}
+                >
+                  {remote}
+                </a>
+              ) : (
+                <span
+                  key={i}
+                  className="text-[11px] font-mono px-2 py-0.5 rounded"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
+                >
+                  {remote}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
