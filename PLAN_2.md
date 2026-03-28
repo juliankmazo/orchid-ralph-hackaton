@@ -2,6 +2,21 @@
 
 > **Note**: This is a spec for a **proof of concept**. The goal is to validate the core idea with the simplest possible implementation, not to build a production system. Cut corners where it makes sense — we can harden later.
 
+## Problem
+
+When AI writes code, the conversations behind it are invisible. A reviewer sees a PR diff but has no idea *why* the AI made certain decisions — what the developer asked for, what alternatives were discussed, what tradeoffs were made. The context is lost.
+
+## Goal
+
+Make AI conversations a first-class artifact of code review. Any developer should be able to look at a commit or PR and see the conversations *related to it* — and eventually ask questions about them.
+
+## Key Principles
+
+- **Dumb write, smart read**: The capture path just stores raw conversation data — no processing, no parsing. It's an immutable, append-only log. All intelligence (linking to commits, surfacing in PRs, answering questions) happens at read time.
+- **Multi-repo by default**: A single conversation can span multiple repos and PRs. A developer working on a feature might touch backend and frontend in one session. The data model supports this from day one.
+- **Periodic sync, not post-hoc**: Conversations stream to the server as they happen, not after the session ends. This makes the data crash-safe and enables live viewing.
+- **Zero friction capture**: Just prefix your command with `orchid`. No config, no hooks, no setup.
+
 ## Core Idea
 
 Replace the hooks-based capture approach with a **command wrapper** inspired by [jai](https://jai.scs.stanford.edu/):
@@ -12,22 +27,34 @@ orchid claude
 
 This launches Claude Code (or any AI tool) and periodically syncs the conversation transcript to the cloud in near-realtime.
 
-## Why This Is Better Than Plan v1
-
-- **Simpler UX**: No hook configuration, no `orchid init` — just prefix your command
-- **Explicit opt-in**: You choose which sessions are tracked
-- **Generalizable**: `orchid claude`, `orchid codex`, `orchid cursor`
-- **No local DB needed**: Cloud is the source of truth from the start
-- **Crash-safe**: Periodic sync means no data loss if the session dies unexpectedly
-
 ## How It Works
 
-1. User runs `orchid claude` in a git repo
+1. User runs `orchid claude` in a **feature folder** (which may contain multiple repos as subfolders)
 2. Orchid launches Claude Code as a child process
 3. A background watcher monitors the JSONL transcript file in `~/.claude/projects/`
 4. Every few seconds (or on new messages), new transcript chunks are pushed to the Orchid server
-5. Orchid detects commits made during the session and links them to the session
+5. Orchid watches for commits across **all git repos** under the working directory and links them to the session
 6. On exit, a final sync ensures everything is captured
+
+### Multi-Repo Sessions
+
+A common workflow: a developer creates a feature folder, clones the server and frontend repos into it, and runs `orchid claude` from the feature folder. That single conversation may produce commits in both repos, across multiple PRs.
+
+```
+feature-new-auth/
+├── backend/      ← git repo, PR #42
+├── frontend/     ← git repo, PR #18
+└── notes.md
+```
+
+```
+orchid claude      ← one session, two repos, two PRs
+```
+
+This means:
+- **Sessions link to multiple repos** — not just one
+- **Sessions link to multiple commits across repos** — timestamps help correlate which parts of the conversation relate to which commits
+- **PR views aggregate** — when viewing PR #42 on the backend, you see the full conversation that also touched the frontend, with the relevant parts highlighted
 
 ## Live Session Viewing
 
@@ -66,13 +93,22 @@ WS     /api/sessions/:id/live           — WebSocket for live session viewing
 
 ```sql
 repos (id, owner, name, remote_url, created_at)
-sessions (id, repo_id, user_id, tool, status, started_at, ended_at)
+sessions (id, tool, status, working_dir, started_at, ended_at)
+session_repos (session_id, repo_id)              -- many-to-many
 chunks (id, session_id, seq, data, received_at)
 commits (sha, repo_id, session_id, committed_at)
-users (id, github_id, github_username, token, created_at)
 ```
 
-Transcripts are stored as ordered chunks — the server appends, the web UI reassembles. This makes streaming writes cheap and live viewing simple.
+- A session can span **multiple repos** (via `session_repos`)
+- Commits link back to both their repo and the session
+- Timestamps on chunks and commits allow correlating conversation turns with specific commits
+- Transcripts are stored as ordered chunks — the server appends, the web UI reassembles
+
+### Dumb Write, Smart Read
+
+The write path does **nothing clever** — it just appends timestamped transcript chunks to the database. No processing, no linking, no parsing. The raw conversation is immutable data.
+
+All intelligence happens at **read time**: linking conversations to commits (via timestamps + git history), correlating with PRs, highlighting relevant sections, answering reviewer questions. This means we can keep building new read-time features without ever changing how data is captured.
 
 ## Phases
 
@@ -82,12 +118,8 @@ Transcripts are stored as ordered chunks — the server appends, the web UI reas
 - Node.js + Express/Fastify + Postgres
 - REST endpoints for session/chunk/commit CRUD
 - WebSocket endpoint for live session streaming
-- GitHub OAuth for auth
+- No auth for POC — server is open / uses a simple API key
 - Deploy on DigitalOcean (single droplet: Node.js + Postgres)
-
-**CLI: `orchid login`**
-- GitHub OAuth via browser (server handles the flow)
-- Store token locally
 
 **CLI: `orchid claude`** (and `orchid codex`, etc.)
 - Detect current git repo and remote URL
