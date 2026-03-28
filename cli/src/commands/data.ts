@@ -41,9 +41,12 @@ function padRight(str: string, len: number): string {
   return str.length >= len ? str.slice(0, len) : str + " ".repeat(len - str.length);
 }
 
-async function fetchSessions(): Promise<Session[]> {
+async function fetchSessions(query?: string): Promise<Session[]> {
   const { apiUrl, apiKey } = getConfig();
-  const url = `${apiUrl.replace(/\/$/, "")}/sessions`;
+  let url = `${apiUrl.replace(/\/$/, "")}/sessions`;
+  if (query) {
+    url += `?q=${encodeURIComponent(query)}`;
+  }
   const res = await fetch(url, {
     headers: { "X-API-Key": apiKey },
   });
@@ -245,6 +248,57 @@ async function dataShow(args: string[]): Promise<void> {
   }
 }
 
+function extractMatchContext(transcript: string, query: string): string {
+  const lowerTranscript = transcript.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const idx = lowerTranscript.indexOf(lowerQuery);
+  if (idx === -1) return "";
+
+  const contextRadius = 60;
+  const start = Math.max(0, idx - contextRadius);
+  const end = Math.min(transcript.length, idx + query.length + contextRadius);
+
+  let snippet = transcript.slice(start, end).replace(/\n/g, " ").replace(/\s+/g, " ");
+  if (start > 0) snippet = "..." + snippet;
+  if (end < transcript.length) snippet = snippet + "...";
+  return snippet;
+}
+
+async function dataSearch(args: string[]): Promise<void> {
+  const query = args.filter((a) => !a.startsWith("-")).join(" ");
+  if (!query) {
+    console.error("Usage: orchid data search <query>");
+    process.exit(1);
+  }
+
+  const sessions = await fetchSessions(query);
+
+  if (sessions.length === 0) {
+    console.log(`No sessions matching "${query}"`);
+    return;
+  }
+
+  for (const s of sessions) {
+    let context = "";
+    try {
+      const full = await fetchSession(s.id);
+      if (full.transcript) {
+        context = extractMatchContext(full.transcript, query);
+      }
+    } catch {
+      // skip context if fetch fails
+    }
+
+    console.log(
+      `${shortId(s.id)}  ${padRight(s.user_name || "unknown", 16)}  ${padRight(timeAgo(s.updated_at || s.started_at), 10)}`
+    );
+    if (context) {
+      console.log(`  ${context}`);
+    }
+    console.log("");
+  }
+}
+
 export function runData(args: string[]): void {
   const subcommand = args[0];
 
@@ -270,6 +324,12 @@ Commands:
       break;
     case "show":
       dataShow(args.slice(1)).catch((err) => {
+        console.error(`Error: ${err.message}`);
+        process.exit(1);
+      });
+      break;
+    case "search":
+      dataSearch(args.slice(1)).catch((err) => {
         console.error(`Error: ${err.message}`);
         process.exit(1);
       });
