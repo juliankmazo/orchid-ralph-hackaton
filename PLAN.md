@@ -130,6 +130,17 @@ The write path does **nothing clever** — it just appends timestamped transcrip
 
 All intelligence happens at **read time**: linking conversations to commits (via timestamps + git history), correlating with PRs, highlighting relevant sections, answering reviewer questions. This means we can keep building new read-time features without ever changing how data is captured.
 
+## **CRITICAL: Test Everything, Use Everything**
+
+After building any piece of functionality, stop and validate it. Don't move on to the next phase until the current one actually works — not just in theory, but by using it for real.
+
+- **Use it manually**: Run `orchid claude`, have a real conversation, check that the data shows up on the server. Use `orchid data` to query it. Does it feel right? Is anything missing?
+- **Automated tests**: Write tests as you go. E2E tests that simulate the full flow — CLI starts a session, syncs data, CLI queries it back. If the tests don't pass, the feature isn't done.
+- **Think hard about validation**: For each feature, ask: how do I know this actually works? What could go wrong? What does "broken" look like? Build the test before moving on.
+- **E2E testing sessions**: Regularly sit down and use the whole system end-to-end as a real user would. These sessions surface problems that unit tests and manual spot-checks miss.
+
+Building without testing leads to a demo that falls apart on stage. Testing as you go means every phase is solid before the next one starts.
+
 ## Phases
 
 ### Phase 1: Capture + Store (the core loop)
