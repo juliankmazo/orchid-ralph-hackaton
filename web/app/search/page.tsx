@@ -162,6 +162,24 @@ export default function SearchPage() {
                     }}
                     onClick={() => {
                       setQuery(term);
+                      // Auto-search after setting query
+                      (async () => {
+                        setLoading(true);
+                        try {
+                          const res = await fetch(
+                            `${API_URL}/sessions?q=${encodeURIComponent(term)}`,
+                            { headers: { "X-API-Key": API_KEY } }
+                          );
+                          const data = await res.json();
+                          setResults(data);
+                          setSearched(true);
+                        } catch {
+                          setResults([]);
+                          setSearched(true);
+                        } finally {
+                          setLoading(false);
+                        }
+                      })();
                     }}
                   >
                     {term}
