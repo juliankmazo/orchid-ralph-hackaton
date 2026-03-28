@@ -1,5 +1,5 @@
 ---
-name: orchid
+name: orchid-context
 description: Query AI coding conversation history captured by Orchid. Use when the user wants to understand why code was written, review a PR with conversation context, explain a commit, search past AI sessions, or list recent coding sessions. Triggers on requests like "find the conversation behind this code", "why was this done", "review with context", "search past sessions", "explain this commit", or any reference to Orchid or AI conversation history.
 allowed-tools: Bash(orchid *)
 ---
