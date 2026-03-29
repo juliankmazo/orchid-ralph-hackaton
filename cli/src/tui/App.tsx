@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Box, Text, useInput, useApp, Newline } from "ink";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Box, Text, useInput, useApp } from "ink";
 import Spinner from "ink-spinner";
 import { getConfig } from "../config";
 
@@ -30,12 +30,13 @@ interface Decision {
 }
 
 type View =
-  | { type: "home" }
-  | { type: "list"; sessions: Session[]; cursor: number }
-  | { type: "show"; session: Session }
-  | { type: "search"; query: string; sessions: Session[]; cursor: number }
-  | { type: "decisions"; repo?: string; decisions: Decision[]; sessions_analyzed: number; cursor: number }
-  | { type: "help" };
+  | { type: "menu"; cursor: number }
+  | { type: "list"; sessions: Session[]; cursor: number; scrollOffset: number }
+  | { type: "show"; session: Session; scrollOffset: number }
+  | { type: "search_input"; query: string }
+  | { type: "search_results"; query: string; sessions: Session[]; cursor: number; scrollOffset: number }
+  | { type: "decisions_input"; query: string }
+  | { type: "decisions"; repo?: string; decisions: Decision[]; sessions_analyzed: number; cursor: number; scrollOffset: number };
 
 type Status =
   | { type: "idle" }
@@ -65,10 +66,10 @@ function basename(p: string): string {
   return p.split("/").filter(Boolean).pop() || p;
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
+async function apiFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
   const { apiUrl, apiKey } = getConfig();
   const url = `${apiUrl.replace(/\/$/, "")}${path}`;
-  const res = await fetch(url, { headers: { "X-API-Key": apiKey } });
+  const res = await fetch(url, { headers: { "X-API-Key": apiKey }, signal });
   if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
   return res.json() as Promise<T>;
 }
@@ -85,7 +86,10 @@ function parseTranscriptTurns(transcript: string): Array<{ role: string; text: s
       const extractText = (c: unknown): string => {
         if (typeof c === "string") return c;
         if (Array.isArray(c))
-          return c.map((b: { type?: string; text?: string }) => (b?.type === "text" ? b.text ?? "" : "")).filter(Boolean).join("\n");
+          return c
+            .map((b: { type?: string; text?: string }) => (b?.type === "text" ? b.text ?? "" : ""))
+            .filter(Boolean)
+            .join("\n");
         return "";
       };
       if (obj.type === "human" || obj.role === "user" || obj.role === "human") {
@@ -100,45 +104,39 @@ function parseTranscriptTurns(transcript: string): Array<{ role: string; text: s
         text = extractText(m.content);
       }
       if (role && text) turns.push({ role, text });
-    } catch { /* skip */ }
+    } catch {
+      // skip malformed JSONL lines
+    }
   }
   return turns;
 }
 
-// ─── Sub-views ────────────────────────────────────────────────────────────────
+const VISIBLE_ROWS = Math.max(5, (process.stdout.rows || 24) - 12);
 
-function StatusBar({ input, status }: { input: string; status: Status }) {
-  return (
-    <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row" gap={1}>
-      {status.type === "loading" ? (
-        <>
-          <Text color="magenta"><Spinner type="dots" /></Text>
-          <Text color="gray">{status.msg}</Text>
-        </>
-      ) : status.type === "error" ? (
-        <Text color="red">{status.msg}</Text>
-      ) : (
-        <>
-          <Text color="magenta">›</Text>
-          <Text>{input || " "}</Text>
-          <Text color="gray" dimColor> type /help for commands</Text>
-        </>
-      )}
-    </Box>
-  );
-}
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+
+const MENU_ITEMS = [
+  { label: "Sessions", desc: "Browse all captured sessions" },
+  { label: "Search", desc: "Search sessions by keyword" },
+  { label: "Decision Log", desc: "AI-extracted architectural decisions" },
+  { label: "Quit", desc: "Exit orchid" },
+];
+
+// ─── Sub-views ────────────────────────────────────────────────────────────────
 
 function Header({ view }: { view: View }) {
   const breadcrumb =
-    view.type === "home" ? "home" :
+    view.type === "menu" ? "home" :
     view.type === "list" ? "sessions" :
     view.type === "show" ? "sessions › detail" :
-    view.type === "search" ? "search" :
+    view.type === "search_input" ? "search" :
+    view.type === "search_results" ? `search › "${view.query}"` :
+    view.type === "decisions_input" ? "decision log" :
     view.type === "decisions" ? "decision log" :
-    "help";
+    "home";
 
   return (
-    <Box flexDirection="row" gap={2} paddingX={1} paddingY={0}>
+    <Box flexDirection="row" gap={2} paddingX={1}>
       <Text bold color="magenta">orchid</Text>
       <Text color="gray">›</Text>
       <Text color="white">{breadcrumb}</Text>
@@ -146,8 +144,65 @@ function Header({ view }: { view: View }) {
   );
 }
 
+function StatusBar({ status }: { status: Status }) {
+  return (
+    <Box borderStyle="single" borderColor="gray" paddingX={1} flexDirection="row" gap={1}>
+      {status.type === "loading" ? (
+        <>
+          <Text color="magenta"><Spinner type="dots" /></Text>
+          <Text color="gray">{status.msg}</Text>
+          <Text color="gray" dimColor>  esc to cancel</Text>
+        </>
+      ) : status.type === "error" ? (
+        <Text color="red">{status.msg}</Text>
+      ) : (
+        <Text color="gray" dimColor>orchid</Text>
+      )}
+    </Box>
+  );
+}
+
+function MenuView({ cursor }: { cursor: number }) {
+  return (
+    <Box flexDirection="column" paddingX={2} paddingY={1} gap={0}>
+      <Box marginBottom={1}>
+        <Text color="gray">Capture and query AI coding sessions.</Text>
+      </Box>
+      {MENU_ITEMS.map((item, i) => (
+        <Box key={item.label} flexDirection="row" gap={2}>
+          <Text
+            color={i === cursor ? "black" : "white"}
+            backgroundColor={i === cursor ? "magenta" : undefined}
+            bold={i === cursor}
+          >
+            {"  "}{item.label.padEnd(16)}{"  "}
+          </Text>
+          <Text color="gray">{item.desc}</Text>
+        </Box>
+      ))}
+      <Box marginTop={1}>
+        <Text color="gray" dimColor>j/k navigate · enter select · ctrl+c exit</Text>
+      </Box>
+    </Box>
+  );
+}
+
+function TextInputView({ label, hint, query }: { label: string; hint: string; query: string }) {
+  return (
+    <Box flexDirection="column" paddingX={2} paddingY={1} gap={1}>
+      <Text color="gray">{label}</Text>
+      <Box flexDirection="row" gap={1}>
+        <Text color="magenta">›</Text>
+        <Text color="white">{query}</Text>
+        <Text color="magenta">█</Text>
+      </Box>
+      <Text color="gray" dimColor>{hint}</Text>
+    </Box>
+  );
+}
+
 function SessionRow({ session, selected }: { session: Session; selected: boolean }) {
-  const status = session.status === "active";
+  const active = session.status === "active";
   const msgCount = session.message_count ?? 0;
   const dir = truncate(basename(session.working_dir || ""), 20);
   const branch = truncate(session.branch || "", 18);
@@ -166,12 +221,22 @@ function SessionRow({ session, selected }: { session: Session; selected: boolean
       <Text color={selected ? "cyan" : "gray"}>{branch}</Text>
       <Text color="gray" dimColor>{ago}</Text>
       <Text color="gray">{msgCount > 0 ? `${msgCount}msg` : ""}</Text>
-      {status && <Text color="green">● live</Text>}
+      {active && <Text color="green">● live</Text>}
     </Box>
   );
 }
 
-function ListView({ sessions, cursor }: { sessions: Session[]; cursor: number }) {
+function ListView({
+  sessions,
+  cursor,
+  scrollOffset,
+  header,
+}: {
+  sessions: Session[];
+  cursor: number;
+  scrollOffset: number;
+  header?: React.ReactNode;
+}) {
   if (sessions.length === 0) {
     return (
       <Box paddingX={2} paddingY={1}>
@@ -180,26 +245,31 @@ function ListView({ sessions, cursor }: { sessions: Session[]; cursor: number })
     );
   }
 
+  const visible = sessions.slice(scrollOffset, scrollOffset + VISIBLE_ROWS);
+
   return (
     <Box flexDirection="column">
-      <Box paddingX={1} paddingY={0}>
-        <Text color="gray" dimColor>  {"ID".padEnd(14)}{"USER".padEnd(16)}{"DIR".padEnd(22)}{"BRANCH".padEnd(20)}AGO</Text>
+      {header}
+      <Box paddingX={1}>
+        <Text color="gray" dimColor>{"  "}{"ID".padEnd(14)}{"USER".padEnd(16)}{"DIR".padEnd(22)}{"BRANCH".padEnd(20)}AGO</Text>
       </Box>
-      {sessions.map((s, i) => (
-        <SessionRow key={s.id} session={s} selected={i === cursor} />
+      {visible.map((s, i) => (
+        <SessionRow key={s.id} session={s} selected={scrollOffset + i === cursor} />
       ))}
-      <Box marginTop={1} paddingX={1}>
-        <Text color="gray" dimColor>j/k navigate · enter open · q back</Text>
+      <Box paddingX={1} marginTop={1} flexDirection="row" gap={2}>
+        {sessions.length > VISIBLE_ROWS && (
+          <Text color="gray" dimColor>{scrollOffset + 1}–{Math.min(scrollOffset + VISIBLE_ROWS, sessions.length)} of {sessions.length}</Text>
+        )}
+        <Text color="gray" dimColor>j/k navigate · enter open · esc back</Text>
       </Box>
     </Box>
   );
 }
 
-function SessionDetailView({ session }: { session: Session }) {
+function SessionDetailView({ session, scrollOffset, webUrl }: { session: Session; scrollOffset: number; webUrl: string }) {
   const turns = session.transcript ? parseTranscriptTurns(session.transcript) : [];
-  const { webUrl, apiUrl } = getConfig();
-  const base = (webUrl || apiUrl).replace(/\/$/, "").replace(/:3000$/, "");
-  const link = `${base}/sessions/${encodeURIComponent(session.id)}`;
+  const link = `${webUrl.replace(/\/$/, "")}/sessions/${encodeURIComponent(session.id)}`;
+  const visibleTurns = turns.slice(scrollOffset, scrollOffset + VISIBLE_ROWS);
 
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} gap={0}>
@@ -218,10 +288,10 @@ function SessionDetailView({ session }: { session: Session }) {
 
       <Text color="magenta" dimColor>─────────────────────────────</Text>
 
-      {turns.slice(0, 6).map((t, i) => (
-        <Box key={i} flexDirection="column" marginTop={1}>
+      {visibleTurns.map((t, i) => (
+        <Box key={scrollOffset + i} flexDirection="column" marginTop={1}>
           <Text color={t.role === "user" ? "cyan" : "magenta"} bold>
-            {t.role === "user" ? "▶ user" : "◀ claude"} #{i + 1}
+            {t.role === "user" ? "▶ user" : "◀ claude"} #{scrollOffset + i + 1}
           </Text>
           <Box paddingLeft={2}>
             <Text color="white" wrap="wrap">{truncate(t.text, 200)}</Text>
@@ -229,27 +299,24 @@ function SessionDetailView({ session }: { session: Session }) {
         </Box>
       ))}
 
-      {turns.length > 6 && (
-        <Box marginTop={1}>
-          <Text color="gray" dimColor>…and {turns.length - 6} more turns</Text>
-        </Box>
-      )}
+      <Box marginTop={1} flexDirection="row" gap={2}>
+        {turns.length > VISIBLE_ROWS && (
+          <Text color="gray" dimColor>turns {scrollOffset + 1}–{Math.min(scrollOffset + VISIBLE_ROWS, turns.length)} of {turns.length}</Text>
+        )}
+        <Text color="gray" dimColor>j/k scroll · esc back</Text>
+      </Box>
 
       <Box marginTop={1} flexDirection="column">
         <Text color="gray" dimColor>open in browser:</Text>
         <Text color="blue" underline>{link}</Text>
       </Box>
-
-      <Box marginTop={1}>
-        <Text color="gray" dimColor>q back</Text>
-      </Box>
     </Box>
   );
 }
 
-function DecisionRow({ d, selected, index }: { d: Decision; selected: boolean; index: number }) {
+function DecisionRow({ d, selected }: { d: Decision; selected: boolean }) {
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={0} marginBottom={1}>
+    <Box flexDirection="column" paddingX={1} marginBottom={1}>
       <Box flexDirection="row" gap={1}>
         <Text backgroundColor={selected ? "magenta" : undefined} color={selected ? "black" : "green"}>
           {" "}✓{" "}
@@ -268,15 +335,29 @@ function DecisionRow({ d, selected, index }: { d: Decision; selected: boolean; i
   );
 }
 
-function DecisionsView({ decisions, sessions_analyzed, repo, cursor }: { decisions: Decision[]; sessions_analyzed: number; repo?: string; cursor: number }) {
+function DecisionsView({
+  decisions,
+  sessions_analyzed,
+  repo,
+  cursor,
+  scrollOffset,
+}: {
+  decisions: Decision[];
+  sessions_analyzed: number;
+  repo?: string;
+  cursor: number;
+  scrollOffset: number;
+}) {
   if (decisions.length === 0) {
     return (
       <Box paddingX={2} paddingY={1} flexDirection="column" gap={1}>
         <Text color="gray">No decisions found{repo ? ` for "${repo}"` : ""}.</Text>
-        <Text color="gray" dimColor>Try: /decisions or /decisions &lt;repo-name&gt;</Text>
+        <Text color="gray" dimColor>Try loading all sessions or filter by a different repo name.</Text>
       </Box>
     );
   }
+
+  const visible = decisions.slice(scrollOffset, scrollOffset + VISIBLE_ROWS);
 
   return (
     <Box flexDirection="column">
@@ -285,60 +366,15 @@ function DecisionsView({ decisions, sessions_analyzed, repo, cursor }: { decisio
           <Text color="white" bold>{decisions.length}</Text> decisions · <Text color="white">{sessions_analyzed}</Text> sessions analyzed{repo ? ` · repo: ${repo}` : ""}
         </Text>
       </Box>
-      {decisions.map((d, i) => (
-        <DecisionRow key={i} d={d} selected={i === cursor} index={i} />
+      {visible.map((d, i) => (
+        <DecisionRow key={scrollOffset + i} d={d} selected={scrollOffset + i === cursor} />
       ))}
-      <Box paddingX={1}>
-        <Text color="gray" dimColor>j/k navigate · q back</Text>
+      <Box paddingX={1} flexDirection="row" gap={2}>
+        {decisions.length > VISIBLE_ROWS && (
+          <Text color="gray" dimColor>{scrollOffset + 1}–{Math.min(scrollOffset + VISIBLE_ROWS, decisions.length)} of {decisions.length}</Text>
+        )}
+        <Text color="gray" dimColor>j/k navigate · esc back</Text>
       </Box>
-    </Box>
-  );
-}
-
-function HelpView() {
-  const commands = [
-    { cmd: "/list", desc: "List all sessions" },
-    { cmd: "/search <query>", desc: "Search across sessions" },
-    { cmd: "/show <id>", desc: "Show session detail (or press enter on /list)" },
-    { cmd: "/decisions [repo]", desc: "AI-extracted architectural decision log" },
-    { cmd: "/help", desc: "Show this help" },
-    { cmd: "q / esc", desc: "Go back / quit" },
-    { cmd: "j / k", desc: "Navigate up/down in lists" },
-    { cmd: "enter", desc: "Open selected item" },
-    { cmd: "ctrl+c", desc: "Exit orchid" },
-  ];
-
-  return (
-    <Box flexDirection="column" paddingX={2} paddingY={1} gap={1}>
-      <Text bold color="magenta">orchid slash commands</Text>
-      <Text color="gray" dimColor>Type a command in the input bar below</Text>
-      <Box flexDirection="column" gap={0} marginTop={1}>
-        {commands.map(({ cmd, desc }) => (
-          <Box key={cmd} flexDirection="row" gap={2}>
-            <Text color="cyan">{cmd.padEnd(24)}</Text>
-            <Text color="gray">{desc}</Text>
-          </Box>
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-function HomeView() {
-  return (
-    <Box flexDirection="column" paddingX={2} paddingY={2} gap={1}>
-      <Text bold color="magenta">🌸 orchid</Text>
-      <Text color="gray">Capture and query AI coding sessions.</Text>
-      <Newline />
-      <Text color="gray" dimColor>Quick start:</Text>
-      <Box flexDirection="column" gap={0} marginLeft={2}>
-        <Text color="cyan">/list</Text>
-        <Text color="cyan">/search jwt</Text>
-        <Text color="cyan">/decisions my-project</Text>
-        <Text color="cyan">/help</Text>
-      </Box>
-      <Newline />
-      <Text color="gray" dimColor>Start a session:  <Text color="white">orchid claude</Text></Text>
     </Box>
   );
 }
@@ -347,209 +383,265 @@ function HomeView() {
 
 export function App() {
   const { exit } = useApp();
-  const [view, setView] = useState<View>({ type: "home" });
-  const [input, setInput] = useState("");
+  const [view, setView] = useState<View>({ type: "menu", cursor: 0 });
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const abortRef = useRef<AbortController | null>(null);
+  const webUrlRef = useRef<string>(getConfig().webUrl);
 
-  const runCommand = useCallback(async (cmd: string) => {
-    const trimmed = cmd.trim();
-    if (!trimmed) return;
+  // Auto-clear errors after 3s
+  useEffect(() => {
+    if (status.type !== "error") return;
+    const id = setTimeout(() => setStatus({ type: "idle" }), 3000);
+    return () => clearTimeout(id);
+  }, [status]);
 
-    if (!trimmed.startsWith("/")) {
-      setStatus({ type: "error", msg: `Unknown input. Commands start with /. Try /help` });
-      setTimeout(() => setStatus({ type: "idle" }), 3000);
-      return;
-    }
-
-    const parts = trimmed.slice(1).split(/\s+/);
-    const command = parts[0].toLowerCase();
-    const rest = parts.slice(1).join(" ");
-
+  const fetchWithTimeout = useCallback(async (path: string): Promise<unknown> => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      switch (command) {
-        case "list": {
-          setStatus({ type: "loading", msg: "Fetching sessions…" });
-          const sessions = await apiFetch<Session[]>("/sessions");
-          setStatus({ type: "idle" });
-          setView({ type: "list", sessions, cursor: 0 });
-          break;
-        }
-        case "search": {
-          if (!rest) {
-            setStatus({ type: "error", msg: "Usage: /search <query>" });
-            setTimeout(() => setStatus({ type: "idle" }), 3000);
-            break;
-          }
-          setStatus({ type: "loading", msg: `Searching for "${rest}"…` });
-          const sessions = await apiFetch<Session[]>(`/sessions?q=${encodeURIComponent(rest)}`);
-          setStatus({ type: "idle" });
-          setView({ type: "search", query: rest, sessions, cursor: 0 });
-          break;
-        }
-        case "show": {
-          const id = rest;
-          if (!id) {
-            setStatus({ type: "error", msg: "Usage: /show <session_id>" });
-            setTimeout(() => setStatus({ type: "idle" }), 3000);
-            break;
-          }
-          setStatus({ type: "loading", msg: `Loading session ${id}…` });
-          const session = await apiFetch<Session>(`/sessions/${encodeURIComponent(id)}`);
-          setStatus({ type: "idle" });
-          setView({ type: "show", session });
-          break;
-        }
-        case "decisions": {
-          const repo = rest || undefined;
-          const path = repo ? `/decisions?repo=${encodeURIComponent(repo)}` : "/decisions";
-          setStatus({ type: "loading", msg: `Extracting decisions${repo ? ` for "${repo}"` : ""}…` });
-          const result = await apiFetch<{ decisions: Decision[]; sessions_analyzed: number }>(path);
-          setStatus({ type: "idle" });
-          setView({ type: "decisions", repo, decisions: result.decisions, sessions_analyzed: result.sessions_analyzed, cursor: 0 });
-          break;
-        }
-        case "help": {
-          setView({ type: "help" });
-          setStatus({ type: "idle" });
-          break;
-        }
-        default: {
-          setStatus({ type: "error", msg: `Unknown command: /${command}. Try /help` });
-          setTimeout(() => setStatus({ type: "idle" }), 3000);
-        }
-      }
-    } catch (err) {
-      setStatus({ type: "error", msg: (err as Error).message });
-      setTimeout(() => setStatus({ type: "idle" }), 4000);
+      return await apiFetch(path, controller.signal);
+    } finally {
+      clearTimeout(timeoutId);
+      abortRef.current = null;
     }
   }, []);
 
-  const openSelected = useCallback(async () => {
-    if (view.type === "list" || view.type === "search") {
-      const { sessions, cursor } = view;
-      const session = sessions[cursor];
-      if (!session) return;
-      setStatus({ type: "loading", msg: `Loading session…` });
-      try {
-        const full = await apiFetch<Session>(`/sessions/${encodeURIComponent(session.id)}`);
-        setStatus({ type: "idle" });
-        setView({ type: "show", session: full });
-      } catch (err) {
-        setStatus({ type: "error", msg: (err as Error).message });
-        setTimeout(() => setStatus({ type: "idle" }), 3000);
-      }
+  const handleFetchError = useCallback((err: unknown) => {
+    if ((err as Error).name === "AbortError") {
+      setStatus({ type: "idle" });
+    } else {
+      setStatus({ type: "error", msg: (err as Error).message });
     }
-  }, [view]);
+  }, []);
+
+  // ─── Navigation helpers ────────────────────────────────────────────────────
+
+  const navigateSessionList = useCallback((delta: number) => {
+    setView((v) => {
+      if (v.type !== "list" && v.type !== "search_results") return v;
+      const newCursor = Math.max(0, Math.min(v.cursor + delta, v.sessions.length - 1));
+      const newScroll =
+        newCursor < v.scrollOffset ? newCursor :
+        newCursor >= v.scrollOffset + VISIBLE_ROWS ? newCursor - VISIBLE_ROWS + 1 :
+        v.scrollOffset;
+      return { ...v, cursor: newCursor, scrollOffset: newScroll };
+    });
+  }, []);
+
+  const navigateDecisions = useCallback((delta: number) => {
+    setView((v) => {
+      if (v.type !== "decisions") return v;
+      const newCursor = Math.max(0, Math.min(v.cursor + delta, v.decisions.length - 1));
+      const newScroll =
+        newCursor < v.scrollOffset ? newCursor :
+        newCursor >= v.scrollOffset + VISIBLE_ROWS ? newCursor - VISIBLE_ROWS + 1 :
+        v.scrollOffset;
+      return { ...v, cursor: newCursor, scrollOffset: newScroll };
+    });
+  }, []);
+
+  const navigateDetail = useCallback((delta: number) => {
+    setView((v) => {
+      if (v.type !== "show") return v;
+      const turns = v.session.transcript ? parseTranscriptTurns(v.session.transcript) : [];
+      const maxOffset = Math.max(0, turns.length - VISIBLE_ROWS);
+      return { ...v, scrollOffset: Math.max(0, Math.min(v.scrollOffset + delta, maxOffset)) };
+    });
+  }, []);
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
+
+  const openSession = useCallback(async (sessions: Session[], cursor: number) => {
+    const session = sessions[cursor];
+    if (!session) return;
+    setStatus({ type: "loading", msg: "Loading session…" });
+    try {
+      const full = await fetchWithTimeout(`/sessions/${encodeURIComponent(session.id)}`) as Session;
+      setStatus({ type: "idle" });
+      setView({ type: "show", session: full, scrollOffset: 0 });
+    } catch (err) {
+      handleFetchError(err);
+    }
+  }, [fetchWithTimeout, handleFetchError]);
+
+  const selectMenuItem = useCallback(async (cursor: number) => {
+    switch (cursor) {
+      case 0: {
+        setStatus({ type: "loading", msg: "Fetching sessions…" });
+        try {
+          const sessions = await fetchWithTimeout("/sessions") as Session[];
+          setStatus({ type: "idle" });
+          setView({ type: "list", sessions, cursor: 0, scrollOffset: 0 });
+        } catch (err) {
+          handleFetchError(err);
+        }
+        break;
+      }
+      case 1:
+        setView({ type: "search_input", query: "" });
+        break;
+      case 2:
+        setView({ type: "decisions_input", query: "" });
+        break;
+      case 3:
+        exit();
+        break;
+    }
+  }, [fetchWithTimeout, handleFetchError, exit]);
+
+  const submitSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setView({ type: "menu", cursor: 1 });
+      return;
+    }
+    setStatus({ type: "loading", msg: `Searching for "${query}"…` });
+    try {
+      const sessions = await fetchWithTimeout(`/sessions?q=${encodeURIComponent(query)}`) as Session[];
+      setStatus({ type: "idle" });
+      setView({ type: "search_results", query, sessions, cursor: 0, scrollOffset: 0 });
+    } catch (err) {
+      handleFetchError(err);
+    }
+  }, [fetchWithTimeout, handleFetchError]);
+
+  const submitDecisions = useCallback(async (query: string) => {
+    const repo = query.trim() || undefined;
+    const path = repo ? `/decisions?repo=${encodeURIComponent(repo)}` : "/decisions";
+    setStatus({ type: "loading", msg: `Extracting decisions${repo ? ` for "${repo}"` : ""}…` });
+    try {
+      const result = await fetchWithTimeout(path) as { decisions: Decision[]; sessions_analyzed: number };
+      setStatus({ type: "idle" });
+      setView({ type: "decisions", repo, decisions: result.decisions, sessions_analyzed: result.sessions_analyzed, cursor: 0, scrollOffset: 0 });
+    } catch (err) {
+      handleFetchError(err);
+    }
+  }, [fetchWithTimeout, handleFetchError]);
+
+  // ─── Input handling ───────────────────────────────────────────────────────
 
   useInput((char, key) => {
-    if (status.type === "loading") return;
-
-    // Navigation keys in list/decisions views
-    const isList = view.type === "list" || view.type === "search";
-    const isDecisions = view.type === "decisions";
-
-    if (isList && !input) {
-      if (char === "j" || key.downArrow) {
-        if (view.type === "list") {
-          setView({ ...view, cursor: Math.min(view.cursor + 1, view.sessions.length - 1) });
-        } else if (view.type === "search") {
-          setView({ ...view, cursor: Math.min(view.cursor + 1, view.sessions.length - 1) });
-        }
-        return;
+    // Cancel loading with esc/q
+    if (status.type === "loading") {
+      if (key.escape || char === "q") {
+        abortRef.current?.abort();
+        setStatus({ type: "idle" });
       }
-      if (char === "k" || key.upArrow) {
-        if (view.type === "list") {
-          setView({ ...view, cursor: Math.max(0, view.cursor - 1) });
-        } else if (view.type === "search") {
-          setView({ ...view, cursor: Math.max(0, view.cursor - 1) });
-        }
+      return;
+    }
+
+    // Text input views
+    if (view.type === "search_input" || view.type === "decisions_input") {
+      if (key.escape) {
+        setView({ type: "menu", cursor: view.type === "search_input" ? 1 : 2 });
         return;
       }
       if (key.return) {
-        openSelected();
+        const { query } = view;
+        if (view.type === "search_input") submitSearch(query);
+        else submitDecisions(query);
         return;
       }
+      if (key.backspace || key.delete) {
+        setView({ ...view, query: view.query.slice(0, -1) });
+        return;
+      }
+      if (char && !key.ctrl && !key.meta) {
+        setView({ ...view, query: view.query + char });
+      }
+      return;
     }
 
-    if (isDecisions && !input) {
+    // Session list navigation
+    if (view.type === "list" || view.type === "search_results") {
+      if (char === "j" || key.downArrow) { navigateSessionList(1); return; }
+      if (char === "k" || key.upArrow) { navigateSessionList(-1); return; }
+      if (key.return) { openSession(view.sessions, view.cursor); return; }
+    }
+
+    // Decisions navigation
+    if (view.type === "decisions") {
+      if (char === "j" || key.downArrow) { navigateDecisions(1); return; }
+      if (char === "k" || key.upArrow) { navigateDecisions(-1); return; }
+    }
+
+    // Session detail scroll
+    if (view.type === "show") {
+      if (char === "j" || key.downArrow) { navigateDetail(1); return; }
+      if (char === "k" || key.upArrow) { navigateDetail(-1); return; }
+    }
+
+    // Menu navigation
+    if (view.type === "menu") {
       if (char === "j" || key.downArrow) {
-        const v = view as { type: "decisions"; decisions: Decision[]; cursor: number; repo?: string; sessions_analyzed: number };
-        setView({ ...v, cursor: Math.min(v.cursor + 1, v.decisions.length - 1) });
+        setView({ ...view, cursor: Math.min(view.cursor + 1, MENU_ITEMS.length - 1) });
         return;
       }
       if (char === "k" || key.upArrow) {
-        const v = view as { type: "decisions"; decisions: Decision[]; cursor: number; repo?: string; sessions_analyzed: number };
-        setView({ ...v, cursor: Math.max(0, v.cursor - 1) });
+        setView({ ...view, cursor: Math.max(0, view.cursor - 1) });
         return;
       }
+      if (key.return) { selectMenuItem(view.cursor); return; }
     }
 
-    // Backspace
-    if (key.backspace || key.delete) {
-      if (input.length > 0) {
-        setInput((prev) => prev.slice(0, -1));
-      } else if (view.type !== "home") {
-        setView({ type: "home" });
-        setStatus({ type: "idle" });
-      }
-      return;
-    }
-
-    // Submit on Enter
-    if (key.return) {
-      if (input.trim()) {
-        const cmd = input;
-        setInput("");
-        runCommand(cmd);
-      }
-      return;
-    }
-
-    // Quit
-    if ((char === "q" || key.escape) && !input) {
-      if (view.type === "home") {
+    // Back / quit
+    if (key.escape || char === "q") {
+      if (view.type === "menu") {
         exit();
       } else {
-        setView({ type: "home" });
-        setStatus({ type: "idle" });
+        setView({ type: "menu", cursor: 0 });
       }
-      return;
-    }
-
-    // ctrl+c handled by Ink natively
-
-    // Type into input
-    if (char && !key.ctrl && !key.meta) {
-      setInput((prev) => prev + char);
     }
   });
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta">
       <Header view={view} />
-      <Box borderStyle="single" borderColor="gray" flexGrow={1} flexDirection="column" paddingY={0}>
-        {view.type === "home" && <HomeView />}
-        {view.type === "list" && <ListView sessions={view.sessions} cursor={view.cursor} />}
-        {view.type === "search" && (
-          <Box flexDirection="column">
-            <Box paddingX={1} marginBottom={1}>
-              <Text color="gray">results for <Text color="cyan">"{view.query}"</Text> · {view.sessions.length} found</Text>
-            </Box>
-            <ListView sessions={view.sessions} cursor={view.cursor} />
-          </Box>
+      <Box borderStyle="single" borderColor="gray" flexGrow={1} flexDirection="column">
+        {view.type === "menu" && <MenuView cursor={view.cursor} />}
+        {view.type === "list" && (
+          <ListView sessions={view.sessions} cursor={view.cursor} scrollOffset={view.scrollOffset} />
         )}
-        {view.type === "show" && <SessionDetailView session={view.session} />}
+        {view.type === "search_input" && (
+          <TextInputView
+            label="Search sessions"
+            hint="type to search · enter to run · esc to cancel"
+            query={view.query}
+          />
+        )}
+        {view.type === "search_results" && (
+          <ListView
+            sessions={view.sessions}
+            cursor={view.cursor}
+            scrollOffset={view.scrollOffset}
+            header={
+              <Box paddingX={1} marginBottom={1}>
+                <Text color="gray">results for <Text color="cyan">"{view.query}"</Text> · {view.sessions.length} found</Text>
+              </Box>
+            }
+          />
+        )}
+        {view.type === "show" && (
+          <SessionDetailView session={view.session} scrollOffset={view.scrollOffset} webUrl={webUrlRef.current} />
+        )}
+        {view.type === "decisions_input" && (
+          <TextInputView
+            label="Decision Log — filter by repo name (leave empty to load all)"
+            hint="type repo name or press enter for all · esc to cancel"
+            query={view.query}
+          />
+        )}
         {view.type === "decisions" && (
           <DecisionsView
             decisions={view.decisions}
             sessions_analyzed={view.sessions_analyzed}
             repo={view.repo}
             cursor={view.cursor}
+            scrollOffset={view.scrollOffset}
           />
         )}
-        {view.type === "help" && <HelpView />}
       </Box>
-      <StatusBar input={input} status={status} />
+      <StatusBar status={status} />
     </Box>
   );
 }

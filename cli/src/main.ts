@@ -44,12 +44,7 @@ Options:
   --help      Show this help
   --version   Show version
 
-TUI slash commands (in interactive mode):
-  /list                List all sessions
-  /search <query>      Search sessions
-  /show <id>           Show session detail
-  /decisions [repo]    AI-extracted decision log
-  /help                Show help
+In the TUI, use j/k or arrow keys to navigate and enter to select.
 `);
     process.exit(0);
   }
