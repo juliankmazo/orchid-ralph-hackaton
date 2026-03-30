@@ -192,7 +192,7 @@ app.get("/sessions/:id/summary", requireApiKey, async (req: Request, res: Respon
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-nano",
         messages: [
           {
             role: "system",
@@ -312,7 +312,7 @@ app.get("/decisions", requireApiKey, async (req: Request, res: Response) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-5.4-nano",
         messages: [
           {
             role: "system",
@@ -479,7 +479,7 @@ Answer the user's question based on this conversation. Be specific and cite rele
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-5.4-nano",
         messages,
         max_tokens: 2000,
         temperature: 0.3,
