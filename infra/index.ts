@@ -90,25 +90,6 @@ const outboundRules: digitalocean.types.input.FirewallOutboundRule[] = [
   { protocol: "icmp", destinationAddresses: ["0.0.0.0/0", "::/0"] },
 ];
 
-// --- AGENT DROPLET (runs Claude Code / Codex in a loop) ---
-const agentDroplet = new digitalocean.Droplet("orchid-agent", {
-  name: "orchid-agent",
-  image: "ubuntu-24-04-x64",
-  region: digitalocean.Region.NYC1,
-  size: "s-8vcpu-16gb", // $96/mo — 8 vCPU, 16GB RAM, 320GB SSD
-  sshKeys: sshKeys.map((k) => k.fingerprint),
-  userData: userData,
-  monitoring: true,
-  backups: false,
-});
-
-const agentFirewall = new digitalocean.Firewall("orchid-agent", {
-  name: "orchid-agent",
-  dropletIds: [agentDroplet.id.apply((id) => parseInt(id))],
-  inboundRules,
-  outboundRules,
-});
-
 // --- DEPLOY DROPLET (hosts the web app, exposed to internet) ---
 const deployDroplet = new digitalocean.Droplet("orchid-deploy", {
   name: "orchid-deploy",
@@ -129,7 +110,5 @@ const deployFirewall = new digitalocean.Firewall("orchid-deploy", {
 });
 
 // Outputs
-export const agentIp = agentDroplet.ipv4Address;
 export const deployIp = deployDroplet.ipv4Address;
-export const sshAgent = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${agentDroplet.ipv4Address}`;
 export const sshDeploy = pulumi.interpolate`ssh -i ~/.ssh/orchid-agent root@${deployDroplet.ipv4Address}`;
